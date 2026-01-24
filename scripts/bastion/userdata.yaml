@@ -1,0 +1,144 @@
+#cloud-config
+# Bastion Host Cloud-Init Configuration
+
+# Set password for ubuntu user
+chpasswd:
+  list: |
+    ubuntu:${bastion_password}
+  expire: false
+
+# Enable password authentication for SSH
+ssh_pwauth: true
+
+# Disable SSH password authentication override by cloud-init
+ssh:
+  emit_keys_to_console: false
+
+# Package management
+package_update: true
+package_upgrade: true
+
+packages:
+  - net-tools
+  - dnsutils
+  - nmap
+  - htop
+  - vim
+  - tmux
+  - curl
+  - wget
+  - jq
+  - python3-pip
+  - unzip
+
+# Write files
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-adlab.conf
+    content: |
+      # AD Lab Bastion Configuration
+      PasswordAuthentication yes
+      GatewayPorts yes
+      AllowTcpForwarding yes
+    permissions: '0644'
+
+  - path: /opt/adlab/scripts/rdp-connect.sh
+    content: |
+      #!/bin/bash
+      # RDP Connection Helper Script
+
+      usage() {
+          echo "Usage: $0 <target_ip> [local_port]"
+          echo "Example: $0 10.100.1.10 3389"
+          exit 1
+      }
+
+      if [ -z "$1" ]; then
+          usage
+      fi
+
+      TARGET_IP="$1"
+      LOCAL_PORT="$${2:-3389}"
+
+      echo "Starting RDP session to $TARGET_IP"
+      echo "Use: xfreerdp /v:$TARGET_IP /u:Administrator"
+
+      xfreerdp /v:$TARGET_IP /u:Administrator /cert-ignore /dynamic-resolution
+    permissions: '0755'
+
+  - path: /opt/adlab/scripts/show-pods.sh
+    content: |
+      #!/bin/bash
+      # Display Pod Information
+
+      echo "=========================================="
+      echo "AD Lab Pod Information"
+      echo "=========================================="
+      echo ""
+      echo "Pod Count: ${pod_count}"
+      echo ""
+      echo "Network Layout:"
+      echo "  VPC CIDR: 10.100.0.0/16"
+      echo "  Public Subnet: 10.100.0.0/24 (Bastion)"
+      echo ""
+
+      for i in $(seq 1 ${pod_count}); do
+          echo "Pod $$i (Subnet: 10.100.$$i.0/24):"
+          echo "  DC:      10.100.$$i.10 (Domain Controller)"
+          echo "  FILESRV: 10.100.$$i.20 (File Server)"
+          echo "  CLIENT:  10.100.$$i.30 (Client)"
+          echo ""
+      done
+
+      echo "=========================================="
+      echo "Connection Examples:"
+      echo "=========================================="
+      echo ""
+      echo "SSH Tunnel for RDP (run on your local machine):"
+      echo "  ssh -L 3389:10.100.1.10:3389 ubuntu@<bastion-ip>"
+      echo ""
+      echo "Then connect via RDP to: localhost:3389"
+      echo ""
+      echo "Domain Credentials:"
+      echo "  Domain: LAB"
+      echo "  Users: tanaka, hasegawa, saitou"
+      echo ""
+      echo "File Shares:"
+      echo "  \\\\FILESRV1\\Share"
+      echo "  \\\\FILESRV1\\Public"
+      echo "  \\\\FILESRV1\\<username>"
+      echo "=========================================="
+    permissions: '0755'
+
+  - path: /etc/motd
+    content: |
+
+      ==========================================
+         AD Lab Bastion Host
+      ==========================================
+
+      Useful Commands:
+        show-pods.sh    - Display pod information
+        rdp-connect.sh  - Connect to Windows host via RDP
+
+      SSH Tunneling Example:
+        ssh -L 3389:10.100.1.30:3389 ubuntu@localhost
+
+      Then RDP to localhost:3389
+
+      ==========================================
+
+    permissions: '0644'
+
+# Run commands
+runcmd:
+  - mkdir -p /opt/adlab/scripts
+  # Create PATH extension script safely
+  - echo 'export PATH="$PATH:/opt/adlab/scripts"' > /etc/profile.d/adlab.sh
+  - chmod 644 /etc/profile.d/adlab.sh
+  # Remove cloud-init SSH override if exists
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config.d/60-cloudimg-settings.conf 2>/dev/null || true
+  # Restart SSH to apply changes
+  - systemctl restart ssh
+  # Install AWS CLI
+  - curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+  - cd /tmp && unzip -q awscliv2.zip && ./aws/install && rm -rf aws awscliv2.zip

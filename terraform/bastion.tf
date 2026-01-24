@@ -3,7 +3,6 @@
 resource "aws_instance" "bastion" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.bastion_instance_type
-  key_name               = var.key_name
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.bastion.id]
 
@@ -14,8 +13,9 @@ resource "aws_instance" "bastion" {
     encrypted             = true
   }
 
-  user_data = base64encode(templatefile("${path.module}/../scripts/bastion/setup.sh", {
-    pod_count = var.pod_count
+  user_data = base64encode(templatefile("${path.module}/../scripts/bastion/userdata.yaml", {
+    pod_count        = var.pod_count
+    bastion_password = var.bastion_password
   }))
 
   tags = {

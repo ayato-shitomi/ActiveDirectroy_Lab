@@ -4,12 +4,17 @@
 # Required: Number of pods to deploy (1-10)
 pod_count = 1
 
-# Required: EC2 key pair name (must exist in AWS)
-key_name = "my-keypair"
+# Required: Bastion SSH password (for ubuntu user)
+bastion_password = "P@ssw0rd123!"
 
-# Required: Windows Administrator password
+# Required: Default Windows Administrator password
 # Must be at least 8 characters, include uppercase, lowercase, number, and special character
 admin_password = "P@ssw0rd123!"
+
+# Optional: Individual machine Administrator passwords (defaults to admin_password)
+# dc_admin_password      = "P@ssw0rd123!"
+# filesrv_admin_password = "P@ssw0rd123!"
+# client_admin_password  = "P@ssw0rd123!"
 
 # Required: Domain Administrator and DSRM password
 domain_password = "P@ssw0rd123!"
@@ -36,6 +41,9 @@ allowed_ssh_cidr = "0.0.0.0/0"
 # vpc_cidr = "10.100.0.0/16"
 
 # Optional: AD User passwords (default: P@ssw0rd!)
-# user_password_tanaka   = "TanakaP@ss123!"
-# user_password_hasegawa = "HasegawaP@ss123!"
-# user_password_saitou   = "SaitouP@ss123!"
+# user_password_tanaka   = "P@ssw0rd!"
+# user_password_hasegawa = "P@ssw0rd!"
+# user_password_saitou   = "P@ssw0rd!"
+
+# Optional: CLIENT local user password (default: P@ssw0rd!)
+# client_local_user_ueda_password = "P@ssw0rd!"

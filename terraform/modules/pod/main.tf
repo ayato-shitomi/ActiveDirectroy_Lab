@@ -8,7 +8,6 @@ locals {
 resource "aws_instance" "dc" {
   ami                    = var.windows_ami_id
   instance_type          = var.dc_instance_type
-  key_name               = var.key_name
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.dc_private_ip
@@ -21,7 +20,7 @@ resource "aws_instance" "dc" {
   }
 
   user_data = base64encode(templatefile("${path.module}/../../../scripts/dc/userdata.ps1", {
-    admin_password  = var.admin_password
+    admin_password  = var.dc_admin_password
     domain_name     = var.domain_name
     domain_netbios  = var.domain_netbios
     domain_password = var.domain_password
@@ -47,7 +46,6 @@ resource "aws_instance" "dc" {
 resource "aws_instance" "filesrv" {
   ami                    = var.windows_ami_id
   instance_type          = var.filesrv_instance_type
-  key_name               = var.key_name
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.filesrv_private_ip
@@ -60,7 +58,7 @@ resource "aws_instance" "filesrv" {
   }
 
   user_data = base64encode(templatefile("${path.module}/../../../scripts/filesrv/userdata.ps1", {
-    admin_password  = var.admin_password
+    admin_password  = var.filesrv_admin_password
     domain_name     = var.domain_name
     domain_netbios  = var.domain_netbios
     domain_password = var.domain_password
@@ -85,7 +83,6 @@ resource "aws_instance" "filesrv" {
 resource "aws_instance" "client" {
   ami                    = var.windows_ami_id
   instance_type          = var.client_instance_type
-  key_name               = var.key_name
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.client_private_ip
@@ -98,12 +95,13 @@ resource "aws_instance" "client" {
   }
 
   user_data = base64encode(templatefile("${path.module}/../../../scripts/client/userdata.ps1", {
-    admin_password  = var.admin_password
+    admin_password  = var.client_admin_password
     domain_name     = var.domain_name
     domain_netbios  = var.domain_netbios
     domain_password = var.domain_password
     dc_ip           = var.dc_private_ip
     computer_name   = "CLIENT${var.pod_index}"
+    ueda_password   = var.client_local_user_ueda_password
   }))
 
   tags = {

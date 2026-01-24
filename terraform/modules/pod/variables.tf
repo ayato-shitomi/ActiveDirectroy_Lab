@@ -25,11 +25,6 @@ variable "security_group_id" {
   type        = string
 }
 
-variable "key_name" {
-  description = "EC2 key pair name"
-  type        = string
-}
-
 variable "windows_ami_id" {
   description = "Windows Server 2022 AMI ID"
   type        = string
@@ -50,8 +45,20 @@ variable "client_instance_type" {
   type        = string
 }
 
-variable "admin_password" {
-  description = "Local Administrator password"
+variable "dc_admin_password" {
+  description = "DC local Administrator password"
+  type        = string
+  sensitive   = true
+}
+
+variable "filesrv_admin_password" {
+  description = "FILESRV local Administrator password"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_admin_password" {
+  description = "CLIENT local Administrator password"
   type        = string
   sensitive   = true
 }
@@ -101,6 +108,12 @@ variable "user_password_hasegawa" {
 
 variable "user_password_saitou" {
   description = "Password for AD user saitou"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_local_user_ueda_password" {
+  description = "Password for CLIENT local user ueda"
   type        = string
   sensitive   = true
 }

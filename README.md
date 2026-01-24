@@ -51,7 +51,6 @@
 1. 適切な権限を持つ**AWSアカウント**
 2. 認証情報が設定された**AWS CLI**
 3. **Terraform** >= 1.0.0
-4. 対象リージョンで作成済みの**EC2キーペア**
 
 ## クイックスタート
 
@@ -66,15 +65,23 @@ cp terraform.tfvars.example terraform.tfvars
 
 ```hcl
 pod_count        = 1
-key_name         = "your-keypair-name"
+bastion_password = "YourSecureP@ssw0rd!"
 admin_password   = "YourSecureP@ssw0rd!"
 domain_password  = "YourSecureP@ssw0rd!"
 allowed_ssh_cidr = "YOUR.IP.ADDRESS/32"
 
-# ADユーザーの個別パスワード（オプション）
-user_password_tanaka   = "TanakaP@ss123!"
-user_password_hasegawa = "HasegawaP@ss123!"
-user_password_saitou   = "SaitouP@ss123!"
+# 各マシンのローカル管理者パスワード（オプション、デフォルトはadmin_password）
+# dc_admin_password      = "YourSecureP@ssw0rd!"
+# filesrv_admin_password = "YourSecureP@ssw0rd!"
+# client_admin_password  = "YourSecureP@ssw0rd!"
+
+# ADユーザーの個別パスワード（オプション、デフォルト: P@ssw0rd!）
+# user_password_tanaka   = "P@ssw0rd!"
+# user_password_hasegawa = "P@ssw0rd!"
+# user_password_saitou   = "P@ssw0rd!"
+
+# CLIENTローカルユーザーのパスワード（オプション、デフォルト: P@ssw0rd!）
+# client_local_user_ueda_password = "P@ssw0rd!"
 ```
 
 ### 2. デプロイ
@@ -102,7 +109,8 @@ Windowsサーバーは自動的に以下を実行します：
 ### BastionへのSSH接続
 
 ```bash
-ssh -i your-key.pem ubuntu@<bastion-public-ip>
+ssh ubuntu@<bastion-public-ip>
+# パスワード: terraform.tfvarsで設定したbastion_password
 ```
 
 ### SSHトンネル経由でのRDP接続
@@ -111,22 +119,36 @@ ssh -i your-key.pem ubuntu@<bastion-public-ip>
 
 ```bash
 # DCへ接続
-ssh -L 3389:10.100.1.10:3389 -i your-key.pem ubuntu@<bastion-public-ip>
+ssh -L 3389:10.100.1.10:3389 ubuntu@<bastion-public-ip>
 
 # FILESRVへ接続（異なるローカルポートを使用）
-ssh -L 3390:10.100.1.20:3389 -i your-key.pem ubuntu@<bastion-public-ip>
+ssh -L 3390:10.100.1.20:3389 ubuntu@<bastion-public-ip>
 
 # CLIENTへ接続
-ssh -L 3391:10.100.1.30:3389 -i your-key.pem ubuntu@<bastion-public-ip>
+ssh -L 3391:10.100.1.30:3389 ubuntu@<bastion-public-ip>
 ```
 
 その後、RDPで`localhost:3389`（または3390、3391）に接続します。
 
 ## デフォルトの認証情報
 
+### Bastion (SSH)
+- **ユーザー名:** ubuntu
+- **パスワード:** （terraform.tfvarsの`bastion_password`で設定）
+
 ### ローカル管理者
 - **ユーザー名:** Administrator
-- **パスワード:** （terraform.tfvarsで設定）
+- **パスワード:** 各マシン毎に設定可能
+  - DC: `dc_admin_password`（未設定時は`admin_password`）
+  - FILESRV: `filesrv_admin_password`（未設定時は`admin_password`）
+  - CLIENT: `client_admin_password`（未設定時は`admin_password`）
+
+### CLIENTローカルユーザー
+| ユーザー名 | パスワード | 説明 |
+|----------|----------|-------------|
+| ueda | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | CLIENT上のローカル管理者ユーザー |
+
+パスワードは `client_local_user_ueda_password` で設定できます。
 
 ### ドメインユーザー
 | ユーザー名 | パスワード | 説明 |
@@ -176,9 +198,8 @@ RDPで接続してログを確認します：
 Get-Content C:\ADLabLogs\userdata.log
 
 # 現在の状態を確認
-Get-Content C:\ADLabLogs\dc-state.txt      # DC用
-Get-Content C:\ADLabLogs\filesrv-state.txt # FILESRV用
-Get-Content C:\ADLabLogs\client-state.txt  # CLIENT用
+Get-Content C:\ADLabLogs\dc-state.txt  # DC用
+Get-Content C:\ADLabLogs\state.txt     # FILESRV/CLIENT用
 ```
 
 ### スクリプトの手動実行
@@ -258,7 +279,7 @@ ActiveDirectroy_Lab/
 │   │   ├── 01-domain-join.ps1    # ドメイン参加
 │   │   └── userdata.ps1          # ブートストラップスクリプト
 │   └── bastion/
-│       └── setup.sh              # Bastionセットアップスクリプト
+│       └── userdata.yaml         # Bastion cloud-init設定
 └── README.md
 ```
 

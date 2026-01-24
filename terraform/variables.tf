@@ -33,15 +33,21 @@ variable "pod_count" {
 }
 
 # EC2 Configuration
-variable "key_name" {
-  description = "Name of the EC2 key pair for SSH/RDP access"
-  type        = string
-}
-
 variable "bastion_instance_type" {
   description = "Instance type for Bastion host"
   type        = string
   default     = "t3.small"
+}
+
+variable "bastion_password" {
+  description = "Password for Bastion ubuntu user (SSH login)"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.bastion_password) >= 8
+    error_message = "Bastion password must be at least 8 characters."
+  }
 }
 
 variable "dc_instance_type" {
@@ -71,7 +77,7 @@ variable "allowed_ssh_cidr" {
 
 # Windows/AD Configuration
 variable "admin_password" {
-  description = "Password for local Administrator account"
+  description = "Default password for local Administrator account (used if individual passwords not set)"
   type        = string
   sensitive   = true
 
@@ -79,6 +85,34 @@ variable "admin_password" {
     condition     = length(var.admin_password) >= 8
     error_message = "Admin password must be at least 8 characters."
   }
+}
+
+variable "dc_admin_password" {
+  description = "Password for DC local Administrator (defaults to admin_password if not set)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "filesrv_admin_password" {
+  description = "Password for FILESRV local Administrator (defaults to admin_password if not set)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "client_admin_password" {
+  description = "Password for CLIENT local Administrator (defaults to admin_password if not set)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "client_local_user_ueda_password" {
+  description = "Password for CLIENT local user ueda"
+  type        = string
+  sensitive   = true
+  default     = "P@ssw0rd!"
 }
 
 variable "domain_name" {
