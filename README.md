@@ -70,6 +70,11 @@ key_name         = "your-keypair-name"
 admin_password   = "YourSecureP@ssw0rd!"
 domain_password  = "YourSecureP@ssw0rd!"
 allowed_ssh_cidr = "YOUR.IP.ADDRESS/32"
+
+# ADユーザーの個別パスワード（オプション）
+user_password_tanaka   = "TanakaP@ss123!"
+user_password_hasegawa = "HasegawaP@ss123!"
+user_password_saitou   = "SaitouP@ss123!"
 ```
 
 ### 2. デプロイ
@@ -126,9 +131,11 @@ ssh -L 3391:10.100.1.30:3389 -i your-key.pem ubuntu@<bastion-public-ip>
 ### ドメインユーザー
 | ユーザー名 | パスワード | 説明 |
 |----------|----------|-------------|
-| LAB\tanaka | P@ssw0rd! | 演習用ユーザー |
-| LAB\hasegawa | P@ssw0rd! | 演習用ユーザー |
-| LAB\saitou | P@ssw0rd! | 演習用ユーザー |
+| LAB\tanaka | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
+| LAB\hasegawa | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
+| LAB\saitou | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
+
+各ユーザーのパスワードは `user_password_tanaka`, `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
 
 ### ドメイン管理者
 - **ユーザー名:** LAB\Administrator
