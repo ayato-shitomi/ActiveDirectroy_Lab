@@ -1,0 +1,41 @@
+# AWS AD Lab Environment - Example Configuration
+# Copy this file to terraform.tfvars and customize the values
+
+# Required: Number of pods to deploy (1-10)
+pod_count = 1
+
+# Required: EC2 key pair name (must exist in AWS)
+key_name = "my-keypair"
+
+# Required: Windows Administrator password
+# Must be at least 8 characters, include uppercase, lowercase, number, and special character
+admin_password = "P@ssw0rd123!"
+
+# Required: Domain Administrator and DSRM password
+domain_password = "P@ssw0rd123!"
+
+# Required: CIDR block allowed for SSH access to Bastion
+# Use your IP address for security (e.g., "203.0.113.0/32")
+# Use "0.0.0.0/0" for open access (not recommended for production)
+allowed_ssh_cidr = "0.0.0.0/0"
+
+# Optional: AWS region (default: ap-northeast-1)
+# aws_region = "ap-northeast-1"
+
+# Optional: Active Directory domain settings
+# domain_name    = "lab.local"
+# domain_netbios = "LAB"
+
+# Optional: Instance types
+# bastion_instance_type = "t3.small"
+# dc_instance_type      = "t3.medium"
+# filesrv_instance_type = "t3.medium"
+# client_instance_type  = "t3.medium"
+
+# Optional: VPC CIDR (default: 10.100.0.0/16)
+# vpc_cidr = "10.100.0.0/16"
+
+# Optional: AD User passwords (default: P@ssw0rd!)
+# user_password_tanaka   = "TanakaP@ss123!"
+# user_password_hasegawa = "HasegawaP@ss123!"
+# user_password_saitou   = "SaitouP@ss123!"
