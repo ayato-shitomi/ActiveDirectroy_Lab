@@ -38,8 +38,8 @@
 | 役割 | OS | IPアドレス | 説明 |
 |------|-----|------------|-------------|
 | DC | Windows Server 2022 | 10.100.X.10 | ドメインコントローラー (lab.local) |
-| FILESRV | Windows Server 2022 | 10.100.X.20 | 共有フォルダを持つファイルサーバー |
-| CLIENT | Windows Server 2022 | 10.100.X.30 | ドメイン参加済みクライアントマシン |
+| FILESRV | Windows Server 2022 | 10.100.X.20 | 共有フォルダを持つファイルサーバー（ドメイン参加） |
+| CLIENT | Windows Server 2022 | 10.100.X.30 | スタンドアロンマシン（DNSのみDCを参照） |
 
 ### 共有リソース
 | 役割 | OS | 説明 |
@@ -96,11 +96,12 @@ terraform apply
 
 Windowsサーバーは自動的に以下を実行します：
 1. ネットワーク設定
-2. AD DSのインストール（ドメインコントローラー）
-3. ドメインコントローラーへの昇格
-4. OU、ユーザー、グループの作成
-5. ドメイン参加（FILESRVとCLIENT）
-6. ファイル共有の作成（FILESRV）
+2. RDP・WinRMの有効化
+3. AD DSのインストール（ドメインコントローラー）
+4. ドメインコントローラーへの昇格
+5. OU、ユーザー、グループの作成
+6. ドメイン参加（FILESRVのみ、CLIENTはスタンドアロン）
+7. ファイル共有の作成（FILESRV）
 
 このプロセスには約15〜20分かかります。
 
@@ -130,6 +131,22 @@ ssh -L 3391:10.100.1.30:3389 ubuntu@<bastion-public-ip>
 
 その後、RDPで`localhost:3389`（または3390、3391）に接続します。
 
+### WinRM経由でのPowerShellリモート接続
+
+SSHトンネルでWinRMポートを転送：
+
+```bash
+# DCへ接続
+ssh -L 5985:10.100.1.10:5985 ubuntu@<bastion-public-ip>
+```
+
+ローカルPowerShellから接続：
+
+```powershell
+$cred = Get-Credential  # Administrator / admin_password
+Enter-PSSession -ComputerName localhost -Credential $cred
+```
+
 ## デフォルトの認証情報
 
 ### Bastion (SSH)
@@ -146,16 +163,21 @@ ssh -L 3391:10.100.1.30:3389 ubuntu@<bastion-public-ip>
 ### CLIENTローカルユーザー
 | ユーザー名 | パスワード | 説明 |
 |----------|----------|-------------|
-| ueda | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | CLIENT上のローカル管理者ユーザー |
+| ueda | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | CLIENT上の標準ユーザー |
 
 パスワードは `client_local_user_ueda_password` で設定できます。
+- Backup Operatorsグループ所属（SeBackupPrivilege / SeRestorePrivilege付与）
+- Remote Management Usersグループ所属（WinRM接続可能）
+- 標準ユーザーのため、UACによる管理者権限への昇格はできません
 
 ### ドメインユーザー
-| ユーザー名 | パスワード | 説明 |
-|----------|----------|-------------|
-| LAB\tanaka | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
-| LAB\hasegawa | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
-| LAB\saitou | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | 演習用ユーザー |
+| ユーザー名 | パスワード | RDPアクセス可能なマシン | 特殊権限 |
+|----------|----------|-------------|----------|
+| LAB\tanaka | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | DC, FILESRV | DCへのローカルログオン権限 |
+| LAB\hasegawa | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | FILESRVのシャットダウン権限 |
+| LAB\saitou | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | hasegawaのパスワード変更権限 |
+
+※ CLIENTはドメイン非参加のため、ローカルユーザー（Administrator, ueda）のみRDP可能
 
 各ユーザーのパスワードは `user_password_tanaka`, `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
 
@@ -172,6 +194,15 @@ ssh -L 3391:10.100.1.30:3389 ubuntu@<bastion-public-ip>
 | \\\\FILESRV1\\Tanaka | C:\Shares\Users\Tanaka | tanakaの個人フォルダ |
 | \\\\FILESRV1\\Hasegawa | C:\Shares\Users\Hasegawa | hasegawaの個人フォルダ |
 | \\\\FILESRV1\\Saitou | C:\Shares\Users\Saitou | saitouの個人フォルダ |
+
+## スケジュールタスク
+
+### FILESRV1: CheckEventNumber
+- **実行タイミング:** システム起動時（120秒後）
+- **実行権限:** SYSTEM（管理者権限）
+- **スクリプト:** `\\FILESRV1\Hasegawa\check_event_number.bat`
+- **出力:** `\\FILESRV1\Hasegawa\event_number.log`
+- **内容:** System/Security/Applicationイベントログの件数を記録
 
 ## Active Directory構成
 

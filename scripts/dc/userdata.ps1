@@ -31,6 +31,12 @@ Set-LocalUser -Name "Administrator" -Password $p;Enable-LocalUser -Name "Adminis
 Rename-Computer -NewName $c.ComputerName -Force
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True;Open-FW
 Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+# Enable WinRM
+Enable-PSRemoting -Force -SkipNetworkProfileCheck
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
+New-NetFirewallRule -DisplayName "WinRM-HTTP" -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -EA SilentlyContinue
+New-NetFirewallRule -DisplayName "WinRM-HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -EA SilentlyContinue
+Write-Host "WinRM enabled"
 $a=Get-NetAdapter|?{$_.Status -eq "Up"}|Select -First 1
 if($a){Set-NetIPInterface -InterfaceIndex $a.ifIndex -Dhcp Disabled -EA SilentlyContinue
 Remove-NetIPAddress -InterfaceIndex $a.ifIndex -Confirm:$false -EA SilentlyContinue
@@ -48,10 +54,12 @@ if($f1.Installed -and $f2.Installed){Set-State "PROMOTE";Restart-Computer -Force
 else{Write-Error "Install failed";exit 1}}
 "PROMOTE"{
 $p=ConvertTo-SecureString $c.DomainPassword -AsPlainText -Force
-Install-ADDSForest -DomainName $c.DomainName -DomainNetbiosName $c.DomainNetbios -SafeModeAdministratorPassword $p -InstallDns -DatabasePath "C:\Windows\NTDS" -LogPath "C:\Windows\NTDS" -SysvolPath "C:\Windows\SYSVOL" -DomainMode "WinThreshold" -ForestMode "WinThreshold" -NoRebootOnCompletion:$false -Force
-Set-State "CONFIG"}
+Install-ADDSForest -DomainName $c.DomainName -DomainNetbiosName $c.DomainNetbios -SafeModeAdministratorPassword $p -InstallDns -DatabasePath "C:\Windows\NTDS" -LogPath "C:\Windows\NTDS" -SysvolPath "C:\Windows\SYSVOL" -DomainMode "WinThreshold" -ForestMode "WinThreshold" -NoRebootOnCompletion:$true -Force
+Set-State "CONFIG";Restart-Computer -Force;exit}
 "CONFIG"{
-for($i=1;$i -le 30;$i++){try{Import-Module ActiveDirectory -EA Stop;Get-ADDomain -EA Stop;break}catch{Write-Host "Wait AD... $i";Start-Sleep 10}}
+$adReady=$false
+for($i=1;$i -le 60;$i++){try{Import-Module ActiveDirectory -EA Stop;Get-ADDomain -EA Stop;$adReady=$true;break}catch{Write-Host "Wait AD... $i/60";Start-Sleep 10}}
+if(-not $adReady){Write-Warning "AD not ready after 10 min, restarting...";Restart-Computer -Force;exit}
 Open-FW;$dn=(Get-ADDomain).DistinguishedName
 @("LabUsers","LabComputers","LabServers","LabGroups")|ForEach-Object{if(!(Get-ADOrganizationalUnit -Filter "Name -eq '$_'" -EA SilentlyContinue)){New-ADOrganizationalUnit -Name $_ -Path $dn -ProtectedFromAccidentalDeletion $false}}
 $ou="OU=LabUsers,$dn"
@@ -62,6 +70,25 @@ New-ADUser -Name "$($_.fn) $($_.ln)" -SamAccountName $_.n -UserPrincipalName "$(
 $go="OU=LabGroups,$dn"
 if(!(Get-ADGroup -Filter "Name -eq 'GG_Lab_Users'" -EA SilentlyContinue)){New-ADGroup -Name "GG_Lab_Users" -SamAccountName "GG_Lab_Users" -GroupCategory Security -GroupScope Global -Path $go}
 @("tanaka","hasegawa","saitou")|ForEach-Object{Add-ADGroupMember -Identity "GG_Lab_Users" -Members $_ -EA SilentlyContinue}
+$hasegawaDN=(Get-ADUser hasegawa).DistinguishedName
+dsacls $hasegawaDN /G "$($c.DomainNetbios)\saitou:CA;Reset Password"|Out-Null
+Write-Host "Granted saitou permission to reset hasegawa password"
+# Grant tanaka local logon right and RDP access to DC
+$tanakaUser=$c.DomainNetbios+"\tanaka"
+Add-LocalGroupMember -Group "Remote Desktop Users" -Member $tanakaUser -EA SilentlyContinue
+Add-LocalGroupMember -Group "Remote Management Users" -Member $tanakaUser -EA SilentlyContinue
+Write-Host "Added tanaka to Remote Desktop Users and Remote Management Users on DC"
+$tanakaSid=(Get-ADUser tanaka).SID.Value
+$tmpCfg="$LogPath\secpol_logon.cfg";$tmpDb="$LogPath\secedit_logon.sdb"
+secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
+$cfg=Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
+if($cfg -match 'SeInteractiveLogonRight\s*=\s*(.*)'){
+$cur=$matches[1].Trim()
+if($cur -notmatch $tanakaSid){$cfg=$cfg -replace 'SeInteractiveLogonRight\s*=\s*.*',"SeInteractiveLogonRight = $cur,*$tanakaSid"}
+}else{$cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`nSeInteractiveLogonRight = *$tanakaSid"}
+$cfg|Set-Content $tmpCfg -Encoding Unicode
+secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
+Write-Host "Granted tanaka local logon right to DC"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
@@ -69,12 +96,12 @@ Stop-Transcript
 '@
 $s | Out-File "$ScriptPath\setup.ps1" -Force -Encoding UTF8
 
-# Launcher
-'Start-Sleep 30;& C:\ADLabScripts\setup.ps1' | Out-File "$ScriptPath\launcher.ps1" -Force
+# Launcher (10s buffer for network initialization)
+'Start-Sleep 10;& C:\ADLabScripts\setup.ps1' | Out-File "$ScriptPath\launcher.ps1" -Force
 
-# Task
+# Task (60s delay after startup)
 $a=New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -NoProfile -File C:\ADLabScripts\launcher.ps1"
-$t=New-ScheduledTaskTrigger -AtStartup;$t.Delay="PT90S"
+$t=New-ScheduledTaskTrigger -AtStartup;$t.Delay="PT60S"
 $p=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 $st=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue

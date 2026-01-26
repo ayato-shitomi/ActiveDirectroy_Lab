@@ -98,10 +98,10 @@ resource "aws_instance" "client" {
     admin_password  = var.client_admin_password
     domain_name     = var.domain_name
     domain_netbios  = var.domain_netbios
-    domain_password = var.domain_password
     dc_ip           = var.dc_private_ip
     computer_name   = "CLIENT${var.pod_index}"
     ueda_password   = var.client_local_user_ueda_password
+    saitou_password = var.user_password_saitou
   }))
 
   tags = {

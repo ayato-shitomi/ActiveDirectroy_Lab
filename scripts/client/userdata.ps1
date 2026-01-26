@@ -4,7 +4,7 @@ $LogPath="C:\ADLabLogs";$ScriptPath="C:\ADLabScripts"
 New-Item -ItemType Directory -Path $LogPath,$ScriptPath -Force -EA SilentlyContinue|Out-Null
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";UedaPassword="${ueda_password}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";UedaPassword="${ueda_password}";SaitouPassword="${saitou_password}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
 
 $s=@'
 $ErrorActionPreference="Continue"
@@ -13,9 +13,10 @@ Start-Transcript -Path "$LogPath\setup.log" -Append
 $c=Get-Content "$ScriptPath\config.json"|ConvertFrom-Json
 function Get-State{if(Test-Path $StateFile){return(Get-Content $StateFile -Raw).Trim()};"INIT"}
 function Set-State($s){$s|Out-File $StateFile -Force;Write-Host "State: $s"}
-function Test-DC{for($i=1;$i -le 20;$i++){try{Resolve-DnsName -Name $c.DomainName -Server $c.DCIP -DnsOnly -EA Stop|Out-Null;return $true}catch{Write-Host "Wait DC $i";Start-Sleep 15}};$false}
+function Test-DC{for($i=1;$i -le 40;$i++){try{Resolve-DnsName -Name $c.DomainName -Server $c.DCIP -DnsOnly -EA Stop|Out-Null;return $true}catch{Write-Host "Wait DC $i/40";Start-Sleep 15}};$false}
 try{
 $state=Get-State;Write-Host "Current: $state"
+# Set DNS to DC (every boot)
 $a=Get-NetAdapter|?{$_.Status -eq "Up"}|Select -First 1
 if($a){Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses @($c.DCIP,"8.8.8.8")}
 switch($state){
@@ -24,35 +25,68 @@ $p=ConvertTo-SecureString $c.AdminPassword -AsPlainText -Force
 Set-LocalUser -Name "Administrator" -Password $p;Enable-LocalUser -Name "Administrator"
 $up=ConvertTo-SecureString $c.UedaPassword -AsPlainText -Force
 New-LocalUser -Name "ueda" -Password $up -PasswordNeverExpires -EA SilentlyContinue
-Add-LocalGroupMember -Group "Administrators" -Member "ueda" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Remote Desktop Users" -Member "ueda" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Users" -Member "ueda" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Backup Operators" -Member "ueda" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Remote Management Users" -Member "ueda" -EA SilentlyContinue
+Write-Host "Added ueda to Backup Operators and Remote Management Users groups"
+# Grant SeBackupPrivilege and SeRestorePrivilege to Backup Operators group
+$backupOpsSid = "S-1-5-32-551"
+$tmpCfg = "$LogPath\secpol_backup.cfg"
+$tmpDb = "$LogPath\secedit_backup.sdb"
+secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
+$cfg = Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
+@("SeBackupPrivilege","SeRestorePrivilege") | ForEach-Object {
+$priv = $_
+if($cfg -match "$priv\s*=\s*(.*)"){
+$cur = $matches[1].Trim()
+if($cur -notmatch $backupOpsSid){
+$cfg = $cfg -replace "$priv\s*=\s*.*", "$priv = $cur,*$backupOpsSid"
+}
+}else{
+$cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`n$priv = *$backupOpsSid"
+}
+}
+$cfg | Set-Content $tmpCfg -Encoding Unicode
+secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
+Write-Host "Granted SeBackupPrivilege and SeRestorePrivilege to Backup Operators"
 Rename-Computer -NewName $c.ComputerName -Force
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -EA SilentlyContinue
 Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing" -EA SilentlyContinue
 Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-Set-State "WAIT";Restart-Computer -Force;exit}
-"WAIT"{if(Test-DC){Set-State "JOIN";Restart-Computer -Force}else{Start-Sleep 60;Restart-Computer -Force};exit}
-"JOIN"{
-Start-Sleep 30
-$p=ConvertTo-SecureString $c.DomainPassword -AsPlainText -Force
-$cred=New-Object PSCredential("$($c.DomainName)\Administrator",$p)
-try{Add-Computer -DomainName $c.DomainName -Credential $cred -Force -EA Stop;Set-State "CONFIG";Restart-Computer -Force}
-catch{Write-Warning $_;Start-Sleep 60;Restart-Computer -Force};exit}
+# Enable WinRM
+Enable-PSRemoting -Force -SkipNetworkProfileCheck
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
+New-NetFirewallRule -DisplayName "WinRM-HTTP" -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -EA SilentlyContinue
+New-NetFirewallRule -DisplayName "WinRM-HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -EA SilentlyContinue
+Write-Host "WinRM enabled"
+Set-State "CONFIG";Restart-Computer -Force;exit}
 "CONFIG"{
-Start-Sleep 30
-Add-LocalGroupMember -Group "Remote Desktop Users" -Member "$($c.DomainNetbios)\Domain Users" -EA SilentlyContinue
+# Wait for DC to be available (for DNS resolution of file server)
+if(-not (Test-DC)){Write-Warning "DC not ready, will retry next boot";Restart-Computer -Force;exit}
+Write-Host "DC is available, configuring..."
+$podNum=$c.ComputerName -replace '\D',''
+$adminDoc="C:\Users\Administrator\Documents"
+New-Item -ItemType Directory -Path $adminDoc -Force -EA SilentlyContinue|Out-Null
+$memoLines=@()
+$memoLines+="=== Domain User Credentials ==="
+$memoLines+="Username: $($c.DomainNetbios)\saitou"
+$memoLines+="Password: $($c.SaitouPassword)"
+$memoLines -join "`r`n"|Out-File "$adminDoc\memo.txt" -Encoding UTF8
+Write-Host "Created memo.txt with saitou credentials"
 $d="C:\Users\Public\Desktop";$ws=New-Object -ComObject WScript.Shell
 $sc=$ws.CreateShortcut("$d\PowerShell.lnk");$sc.TargetPath="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";$sc.Save()
-$sc=$ws.CreateShortcut("$d\File Server.lnk");$sc.TargetPath="\\FILESRV1\Share";$sc.Save()
+$sc=$ws.CreateShortcut("$d\File Server.lnk");$sc.TargetPath="\\FILESRV$podNum\Share";$sc.Save()
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript
 '@
 $s|Out-File "$ScriptPath\setup.ps1" -Force -Encoding UTF8
-'Start-Sleep 30;& C:\ADLabScripts\setup.ps1'|Out-File "$ScriptPath\launcher.ps1" -Force
+'Start-Sleep 10;& C:\ADLabScripts\setup.ps1'|Out-File "$ScriptPath\launcher.ps1" -Force
 $a=New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -NoProfile -File C:\ADLabScripts\launcher.ps1"
-$t=New-ScheduledTaskTrigger -AtStartup;$t.Delay="PT90S"
+$t=New-ScheduledTaskTrigger -AtStartup;$t.Delay="PT60S"
 $p=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 $st=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue

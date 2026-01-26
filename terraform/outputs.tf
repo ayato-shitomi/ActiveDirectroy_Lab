@@ -7,7 +7,7 @@ output "bastion_public_ip" {
 
 output "bastion_ssh_command" {
   description = "SSH command to connect to Bastion"
-  value       = "ssh -i <your-key.pem> ubuntu@${aws_instance.bastion.public_ip}"
+  value       = "ssh ubuntu@${aws_instance.bastion.public_ip}"
 }
 
 output "vpc_id" {
@@ -22,17 +22,17 @@ output "pod_info" {
       dc = {
         instance_id = pod.dc_instance_id
         private_ip  = pod.dc_private_ip
-        rdp_tunnel  = "ssh -L 3389:${pod.dc_private_ip}:3389 -i <your-key.pem> ubuntu@${aws_instance.bastion.public_ip}"
+        rdp_tunnel  = "ssh -L 3389:${pod.dc_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip}"
       }
       filesrv = {
         instance_id = pod.filesrv_instance_id
         private_ip  = pod.filesrv_private_ip
-        rdp_tunnel  = "ssh -L 3390:${pod.filesrv_private_ip}:3389 -i <your-key.pem> ubuntu@${aws_instance.bastion.public_ip}"
+        rdp_tunnel  = "ssh -L 3390:${pod.filesrv_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip}"
       }
       client = {
         instance_id = pod.client_instance_id
         private_ip  = pod.client_private_ip
-        rdp_tunnel  = "ssh -L 3391:${pod.client_private_ip}:3389 -i <your-key.pem> ubuntu@${aws_instance.bastion.public_ip}"
+        rdp_tunnel  = "ssh -L 3391:${pod.client_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip}"
       }
     }
   }
@@ -45,21 +45,37 @@ output "connection_instructions" {
     ==================== AD Lab Connection Instructions ====================
 
     1. SSH to Bastion:
-       ssh -i <your-key.pem> ubuntu@${aws_instance.bastion.public_ip}
+       ssh ubuntu@${aws_instance.bastion.public_ip}
+       Password: <bastion_password>
 
     2. For RDP access, create SSH tunnel through Bastion:
 
-       Pod 1 DC:      ssh -L 3389:${module.pod[0].dc_private_ip}:3389 -i <key.pem> ubuntu@${aws_instance.bastion.public_ip}
-       Pod 1 FILESRV: ssh -L 3390:${module.pod[0].filesrv_private_ip}:3389 -i <key.pem> ubuntu@${aws_instance.bastion.public_ip}
-       Pod 1 CLIENT:  ssh -L 3391:${module.pod[0].client_private_ip}:3389 -i <key.pem> ubuntu@${aws_instance.bastion.public_ip}
+       ssh -L 3389:${module.pod[0].dc_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip} # Pod 1 DC
+       ssh -L 3390:${module.pod[0].filesrv_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip} # Pod 1 FILESRV
+       ssh -L 3391:${module.pod[0].client_private_ip}:3389 ubuntu@${aws_instance.bastion.public_ip} # Pod 1 CLIENT
 
     3. Connect via RDP to localhost:3389 (or 3390, 3391)
 
     4. Login credentials:
-       - Local Admin: Administrator / <admin_password>
-       - Domain User: LAB\\tanaka / P@ssw0rd!
-       - Domain User: LAB\\hasegawa / P@ssw0rd!
-       - Domain User: LAB\\saitou / P@ssw0rd!
+
+       [Bastion SSH]
+       - User: ubuntu / <bastion_password>
+
+       [Local Administrator]
+       - DC:      Administrator / <dc_admin_password or admin_password>
+       - FILESRV: Administrator / <filesrv_admin_password or admin_password>
+       - CLIENT:  Administrator / <client_admin_password or admin_password>
+
+       [CLIENT Local User - Standard User (No Admin)]
+       - ueda / <client_local_user_ueda_password> (default: P@ssw0rd!)
+
+       [Domain Administrator]
+       - LAB\\Administrator / <domain_password>
+
+       [Domain Users]
+       - LAB\\tanaka / <user_password_tanaka> (default: P@ssw0rd!)
+       - LAB\\hasegawa / <user_password_hasegawa> (default: P@ssw0rd!)
+       - LAB\\saitou / <user_password_saitou> (default: P@ssw0rd!)
 
     5. Test file shares:
        \\\\FILESRV${length(module.pod) > 0 ? "1" : ""}\\Share
