@@ -68,6 +68,14 @@ Add-LocalGroupMember -Group "Remote Management Users" -Member $member -EA Silent
 Write-Host "Added $member to Remote Desktop Users and Remote Management Users"
 break
 }catch{Write-Warning "Retry $retry for $member : $_";Start-Sleep 5}}}
+# Add nakanishi to local Administrators group (for privilege escalation scenario)
+$nakanishiMember="$($c.DomainNetbios)\nakanishi"
+for($retry=1;$retry -le 3;$retry++){
+try{
+Add-LocalGroupMember -Group "Administrators" -Member $nakanishiMember -EA SilentlyContinue
+Write-Host "Added $nakanishiMember to local Administrators group"
+break
+}catch{Write-Warning "Retry $retry for adding $nakanishiMember to Administrators : $_";Start-Sleep 5}}
 # Grant SeShutdownPrivilege to hasegawa (for restart capability)
 Write-Host "Granting SeShutdownPrivilege to hasegawa..."
 $hasegawaAccount = "$($c.DomainNetbios)\hasegawa"
