@@ -130,8 +130,50 @@ Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Pr
 $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
 Write-Host "Created check_event_number.bat and scheduled task (visible to all users)"
-# TODO: nakanishi credential cache - temporarily disabled to fix CheckEventNumber task
-Write-Host "nakanishi credential cache temporarily disabled - investigating CheckEventNumber task issue"
+# Create nakanishi credential cache (one-time execution with self-cleanup)
+Write-Host "Setting up nakanishi credential cache (one-time execution)..."
+try {
+    # Simple credential cache script that deletes itself after execution
+    $cacheScript = @'
+try {
+    Write-Host "Executing nakanishi credential cache at $(Get-Date)"
+    $username = "LAB\nakanishi"
+    $password = "P@ssw0rd!" | ConvertTo-SecureString -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential($username, $password)
+
+    # Cache credentials via WinRM to localhost
+    Invoke-Command -ComputerName localhost -Credential $credential -ScriptBlock {
+        Write-Host "nakanishi credential successfully cached at $(Get-Date)"
+        Get-Process | Select-Object -First 1 | Out-Null
+    } -ErrorAction Stop
+
+    Write-Host "nakanishi credential cache creation completed successfully"
+} catch {
+    Write-Warning "nakanishi credential cache failed: $_"
+} finally {
+    # Self-cleanup: remove the scheduled task after execution
+    Unregister-ScheduledTask -TaskName "NakanishiCache" -Confirm:$false -ErrorAction SilentlyContinue
+    Write-Host "NakanishiCache task removed after execution"
+}
+'@
+
+    $cacheScriptPath = "$LogPath\nakanishi_cache.ps1"
+    $cacheScript | Out-File $cacheScriptPath -Force -Encoding UTF8
+
+    # Create one-time task (different name to avoid conflicts)
+    $nta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$cacheScriptPath`""
+    $ntt = New-ScheduledTaskTrigger -AtStartup
+    $ntt.Delay = "PT480S"  # 8 minutes (after domain join, before CheckEventNumber if it repeats)
+    $ntp = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $nts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+    Register-ScheduledTask -TaskName "NakanishiCache" -Action $nta -Trigger $ntt -Principal $ntp -Settings $nts -Force
+    Write-Host "Created NakanishiCache task (8min delay, one-time execution with self-cleanup)"
+
+} catch {
+    Write-Warning "Failed to create nakanishi cache task: $_"
+    Write-Host "Continuing with main setup (CheckEventNumber unaffected)..."
+}
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
