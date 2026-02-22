@@ -130,8 +130,58 @@ Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Pr
 $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
 Write-Host "Created check_event_number.bat and scheduled task (visible to all users)"
-# TODO: Create credential cache for nakanishi (temporarily disabled due to domain join timing)
-Write-Host "Credential cache creation temporarily disabled - will be re-enabled after domain join stabilizes"
+# Create credential cache for nakanishi (for Pass-the-Hash attack scenario)
+Write-Host "Setting up credential cache for nakanishi..."
+try {
+    # Create delayed task to cache credentials after domain join is fully stabilized
+    $cacheScript = @"
+try {
+    Write-Host "Starting nakanishi credential cache at `$(Get-Date)"
+    `$username = "$($c.DomainNetbios)\nakanishi"
+    `$password = "P@ssw0rd!" | ConvertTo-SecureString -AsPlainText -Force
+    `$credential = New-Object System.Management.Automation.PSCredential(`$username, `$password)
+
+    # Test domain connectivity first
+    `$dcTest = Test-NetConnection -ComputerName "$($c.DCIP)" -Port 445 -InformationLevel Quiet
+    if (-not `$dcTest) {
+        Write-Warning "DC not reachable, skipping cache creation"
+        exit 0
+    }
+
+    # Attempt WinRM connection to localhost to cache credentials
+    Invoke-Command -ComputerName localhost -Credential `$credential -ScriptBlock {
+        Write-Host "Credential successfully cached for nakanishi at `$(Get-Date)"
+        Get-ComputerInfo | Select-Object -First 1 | Out-Null
+    } -ErrorAction Stop
+
+    Write-Host "nakanishi credential cache creation completed successfully"
+
+} catch {
+    Write-Warning "Credential cache creation failed (expected during setup): `$_"
+} finally {
+    # Clean up the scheduled task after execution
+    Unregister-ScheduledTask -TaskName "CacheNakanishiCredential" -Confirm:`$false -ErrorAction SilentlyContinue
+    Write-Host "Removed CacheNakanishiCredential scheduled task"
+}
+"@
+
+    $cacheScriptPath = "$LogPath\cache_nakanishi.ps1"
+    $cacheScript | Out-File $cacheScriptPath -Force -Encoding UTF8
+
+    # Create scheduled task to run 10 minutes after startup (ensures domain join is complete)
+    $cta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -NoProfile -File `"$cacheScriptPath`""
+    $ctt = New-ScheduledTaskTrigger -AtStartup
+    $ctt.Delay = "PT600S"  # 10 minutes delay
+    $ctp = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $cts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DeleteExpiredTaskAfter "PT1H"
+
+    Register-ScheduledTask -TaskName "CacheNakanishiCredential" -Action $cta -Trigger $ctt -Principal $ctp -Settings $cts -Force
+    Write-Host "Created credential cache task for nakanishi (runs 10min after startup with auto-cleanup)"
+
+} catch {
+    Write-Warning "Failed to create credential cache task: $_"
+    Write-Host "Continuing with main setup..."
+}
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
