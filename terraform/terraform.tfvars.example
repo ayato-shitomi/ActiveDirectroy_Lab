@@ -41,9 +41,9 @@ allowed_ssh_cidr = "0.0.0.0/0"
 # vpc_cidr = "10.100.0.0/16"
 
 # Optional: AD User passwords (default: P@ssw0rd!)
-# user_password_tanaka   = "P@ssw0rd!"
+# user_password_nakanishi   = "P@ssw0rd!"
 # user_password_hasegawa = "P@ssw0rd!"
 # user_password_saitou   = "P@ssw0rd!"
 
 # Optional: CLIENT local user password (default: P@ssw0rd!)
-# client_local_user_ueda_password = "P@ssw0rd!"
+# client_local_user_nagata_password = "P@ssw0rd!"
