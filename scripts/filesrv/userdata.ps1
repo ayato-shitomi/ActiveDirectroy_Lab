@@ -130,6 +130,38 @@ Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Pr
 $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
 Write-Host "Created check_event_number.bat and scheduled task (visible to all users)"
+# Create credential cache for nakanishi (for Pass-the-Hash attack scenario)
+Write-Host "Setting up credential cache for nakanishi..."
+$nakanishiUser = "$($c.DomainNetbios)\nakanishi"
+$nakanishiSid=$null
+for($i=1;$i -le 5;$i++){
+try{$nakanishiSid=(New-Object System.Security.Principal.NTAccount($nakanishiUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value;break}
+catch{Write-Warning "nakanishi SID lookup retry $i : $_";Start-Sleep 5}}
+if(-not $nakanishiSid){Write-Warning "Failed to get nakanishi SID, skipping cache creation"}else{
+Write-Host "nakanishi SID: $nakanishiSid"
+# Create a PowerShell script to cache credentials
+$cacheScript = @'
+$username = "LAB\nakanishi"
+$password = "P@ssw0rd!" | ConvertTo-SecureString -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential($username, $password)
+try {
+    # Attempt WinRM connection to localhost to cache credentials
+    Invoke-Command -ComputerName localhost -Credential $credential -ScriptBlock {
+        Write-Host "Credential cached for nakanishi at $(Get-Date)"
+        Get-Process | Select-Object -First 1 | Out-Null
+    } -ErrorAction SilentlyContinue
+} catch {
+    Write-Host "Cache attempt completed (errors expected): $_"
+}
+'@
+$cacheScriptPath = "$LogPath\cache_nakanishi.ps1"
+$cacheScript | Out-File $cacheScriptPath -Force -Encoding UTF8
+$cta=New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -NoProfile -File `"$cacheScriptPath`""
+$ctt=New-ScheduledTaskTrigger -AtStartup;$ctt.Delay="PT300S"
+$ctp=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$cts=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Register-ScheduledTask -TaskName "CacheNakanishiCredential" -Action $cta -Trigger $ctt -Principal $ctp -Settings $cts -Force
+Write-Host "Created credential cache task for nakanishi (runs 5min after startup)"}
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
