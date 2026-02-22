@@ -130,14 +130,22 @@ $batLines+="@echo off"
 $batLines+="for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName System -EA SilentlyContinue).Count`"') do set SYSCNT=%%a"
 $batLines+="for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Security -EA SilentlyContinue).Count`"') do set SECCNT=%%a"
 $batLines+="for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Application -EA SilentlyContinue).Count`"') do set APPCNT=%%a"
-$batLines+="echo %date% %time% - System:%SYSCNT% Security:%SECCNT% Application:%APPCNT% >> $eventLogPath"
+$batLines+="echo %date% %time% - System:%SYSCNT% Security:%SECCNT% Application:%APPCNT% >> `"$eventLogPath`""
 $batLines -join "`r`n"|Out-File $batPath -Encoding ASCII
-# Set owner to hasegawa and grant write permission
+# Set owner to hasegawa and grant write permission (with retry for domain user recognition)
 $hasegawaUser = $c.DomainNetbios + "\hasegawa"
-icacls $batPath /setowner $hasegawaUser 2>&1 | Out-Null
-$grantArg = $hasegawaUser + ":(M)"
-icacls $batPath /grant $grantArg 2>&1 | Out-Null
-Write-Host "Set owner of check_event_number.bat to hasegawa"
+for($i=1; $i -le 3; $i++) {
+    try {
+        icacls $batPath /setowner $hasegawaUser 2>&1 | Out-Null
+        $grantArg = $hasegawaUser + ":(M)"
+        icacls $batPath /grant $grantArg 2>&1 | Out-Null
+        Write-Host "Set owner of check_event_number.bat to hasegawa (attempt $i)"
+        break
+    } catch {
+        Write-Warning "Failed to set hasegawa ownership attempt $i : $_"
+        if($i -lt 3) { Start-Sleep 10 }
+    }
+}
 $ta=New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$batPath`""
 $tt=New-ScheduledTaskTrigger -AtStartup;$tt.Delay="PT120S"
 $tp=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
