@@ -50,6 +50,32 @@ $cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`n$priv = *$ba
 $cfg | Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
 Write-Host "Granted SeBackupPrivilege and SeRestorePrivilege to Backup Operators"
+# Also grant privileges directly to nagata user (additional security for RDP access)
+$nagataAccount = "nagata"
+$nagataSid = $null
+try {
+    $nagataLocalUser = Get-LocalUser -Name $nagataAccount -EA Stop
+    $nagataSid = $nagataLocalUser.SID.Value
+    Write-Host "nagata SID: $nagataSid"
+
+    # Grant privileges directly to nagata user
+    @("SeBackupPrivilege","SeRestorePrivilege") | ForEach-Object {
+        $priv = $_
+        if($cfg -match "$priv\s*=\s*(.*)"){
+            $cur = $matches[1].Trim()
+            if($cur -notmatch $nagataSid){
+                $cfg = $cfg -replace "$priv\s*=\s*.*", "$priv = $cur,*$nagataSid"
+            }
+        }else{
+            $cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`n$priv = *$nagataSid"
+        }
+    }
+    $cfg | Set-Content $tmpCfg -Encoding Unicode
+    secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
+    Write-Host "Granted SeBackupPrivilege and SeRestorePrivilege directly to nagata user"
+} catch {
+    Write-Warning "Could not grant direct privileges to nagata: $_"
+}
 Rename-Computer -NewName $c.ComputerName -Force
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -EA SilentlyContinue
@@ -61,6 +87,10 @@ Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
 New-NetFirewallRule -DisplayName "WinRM-HTTP" -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -EA SilentlyContinue
 New-NetFirewallRule -DisplayName "WinRM-HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -EA SilentlyContinue
 Write-Host "WinRM enabled"
+# Disable UAC Token Filtering for RDP access (enables full tokens for local accounts)
+Write-Host "Disabling UAC Token Filtering for local accounts..."
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "LocalAccountTokenFilterPolicy" -Value 1
+Write-Host "LocalAccountTokenFilterPolicy set to 1 - local accounts will have full tokens via RDP"
 Set-State "CONFIG";Restart-Computer -Force;exit}
 "CONFIG"{
 # Wait for DC to be available (for DNS resolution of file server)
