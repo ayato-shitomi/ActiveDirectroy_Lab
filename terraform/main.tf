@@ -67,11 +67,11 @@ module "pod" {
   domain_netbios   = var.domain_netbios
   domain_password  = var.domain_password
 
-  user_password_tanaka   = var.user_password_tanaka
+  user_password_nakanishi   = var.user_password_nakanishi
   user_password_hasegawa = var.user_password_hasegawa
   user_password_saitou   = var.user_password_saitou
 
-  client_local_user_ueda_password = var.client_local_user_ueda_password
+  client_local_user_nagata_password = var.client_local_user_nagata_password
 
   dc_private_ip      = cidrhost(aws_subnet.private[count.index].cidr_block, 10)
   filesrv_private_ip = cidrhost(aws_subnet.private[count.index].cidr_block, 20)

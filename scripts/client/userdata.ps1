@@ -4,7 +4,7 @@ $LogPath="C:\ADLabLogs";$ScriptPath="C:\ADLabScripts"
 New-Item -ItemType Directory -Path $LogPath,$ScriptPath -Force -EA SilentlyContinue|Out-Null
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";UedaPassword="${ueda_password}";SaitouPassword="${saitou_password}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";NagataPassword="${nagata_password}";SaitouPassword="${saitou_password}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
 
 $s=@'
 $ErrorActionPreference="Continue"
@@ -23,13 +23,13 @@ switch($state){
 "INIT"{
 $p=ConvertTo-SecureString $c.AdminPassword -AsPlainText -Force
 Set-LocalUser -Name "Administrator" -Password $p;Enable-LocalUser -Name "Administrator"
-$up=ConvertTo-SecureString $c.UedaPassword -AsPlainText -Force
-New-LocalUser -Name "ueda" -Password $up -PasswordNeverExpires -EA SilentlyContinue
-Add-LocalGroupMember -Group "Remote Desktop Users" -Member "ueda" -EA SilentlyContinue
-Add-LocalGroupMember -Group "Users" -Member "ueda" -EA SilentlyContinue
-Add-LocalGroupMember -Group "Backup Operators" -Member "ueda" -EA SilentlyContinue
-Add-LocalGroupMember -Group "Remote Management Users" -Member "ueda" -EA SilentlyContinue
-Write-Host "Added ueda to Backup Operators and Remote Management Users groups"
+$up=ConvertTo-SecureString $c.NagataPassword -AsPlainText -Force
+New-LocalUser -Name "nagata" -Password $up -PasswordNeverExpires -EA SilentlyContinue
+Add-LocalGroupMember -Group "Remote Desktop Users" -Member "nagata" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Users" -Member "nagata" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Backup Operators" -Member "nagata" -EA SilentlyContinue
+Add-LocalGroupMember -Group "Remote Management Users" -Member "nagata" -EA SilentlyContinue
+Write-Host "Added nagata to Backup Operators and Remote Management Users groups"
 # Grant SeBackupPrivilege and SeRestorePrivilege to Backup Operators group
 $backupOpsSid = "S-1-5-32-551"
 $tmpCfg = "$LogPath\secpol_backup.cfg"

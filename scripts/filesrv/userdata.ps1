@@ -53,7 +53,7 @@ Install-WindowsFeature -Name FS-FileServer -IncludeManagementTools
 Write-Host "Installing RSAT AD Tools..."
 Add-WindowsCapability -Online -Name "Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0" -EA SilentlyContinue
 Write-Host "Waiting for AD users to be available..."
-$adUsers=@("tanaka","hasegawa","saitou")
+$adUsers=@("nakanishi","hasegawa","saitou")
 for($i=1;$i -le 30;$i++){
 $allFound=$true
 foreach($u in $adUsers){try{$null=[ADSI]"WinNT://$($c.DomainNetbios)/$u,user"}catch{$allFound=$false;break}}
@@ -90,8 +90,8 @@ $cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`nSeShutdownPr
 $cfg | Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
 Write-Host "SeShutdownPrivilege granted to hasegawa"}
-$r="C:\Shares";@("$r\Share","$r\Public","$r\Users\Tanaka","$r\Users\Hasegawa","$r\Users\Saitou")|ForEach-Object{New-Item -ItemType Directory -Path $_ -Force -EA SilentlyContinue}
-@(@{N="Share";P="$r\Share";F=@("Everyone")},@{N="Public";P="$r\Public";R=@("Everyone");F=@("Administrators")},@{N="Tanaka";P="$r\Users\Tanaka";F=@("$($c.DomainNetbios)\tanaka","Administrators")},@{N="Hasegawa";P="$r\Users\Hasegawa";F=@("$($c.DomainNetbios)\hasegawa","Administrators")},@{N="Saitou";P="$r\Users\Saitou";F=@("$($c.DomainNetbios)\saitou","Administrators")})|ForEach-Object{
+$r="C:\Shares";@("$r\Share","$r\Public","$r\Users\Nakanishi","$r\Users\Hasegawa","$r\Users\Saitou")|ForEach-Object{New-Item -ItemType Directory -Path $_ -Force -EA SilentlyContinue}
+@(@{N="Share";P="$r\Share";F=@("Everyone")},@{N="Public";P="$r\Public";R=@("Everyone");F=@("Administrators")},@{N="Nakanishi";P="$r\Users\Nakanishi";F=@("$($c.DomainNetbios)\nakanishi","Administrators")},@{N="Hasegawa";P="$r\Users\Hasegawa";F=@("$($c.DomainNetbios)\hasegawa","Administrators")},@{N="Saitou";P="$r\Users\Saitou";F=@("$($c.DomainNetbios)\saitou","Administrators")})|ForEach-Object{
 Remove-SmbShare -Name $_.N -Force -EA SilentlyContinue
 $pa=@{Name=$_.N;Path=$_.P;FullAccess=$_.F};if($_.R){$pa.ReadAccess=$_.R}
 New-SmbShare @pa}

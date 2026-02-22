@@ -108,8 +108,8 @@ variable "client_admin_password" {
   default     = ""
 }
 
-variable "client_local_user_ueda_password" {
-  description = "Password for CLIENT local user ueda"
+variable "client_local_user_nagata_password" {
+  description = "Password for CLIENT local user nagata"
   type        = string
   sensitive   = true
   default     = "P@ssw0rd!"
@@ -139,8 +139,8 @@ variable "domain_password" {
 }
 
 # AD User Passwords
-variable "user_password_tanaka" {
-  description = "Password for AD user tanaka"
+variable "user_password_nakanishi" {
+  description = "Password for AD user nakanishi"
   type        = string
   sensitive   = true
   default     = "P@ssw0rd!"

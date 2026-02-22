@@ -76,12 +76,12 @@ allowed_ssh_cidr = "YOUR.IP.ADDRESS/32"
 # client_admin_password  = "YourSecureP@ssw0rd!"
 
 # ADユーザーの個別パスワード（オプション、デフォルト: P@ssw0rd!）
-# user_password_tanaka   = "P@ssw0rd!"
+# user_password_nakanishi   = "P@ssw0rd!"
 # user_password_hasegawa = "P@ssw0rd!"
 # user_password_saitou   = "P@ssw0rd!"
 
 # CLIENTローカルユーザーのパスワード（オプション、デフォルト: P@ssw0rd!）
-# client_local_user_ueda_password = "P@ssw0rd!"
+# client_local_user_nagata_password = "P@ssw0rd!"
 ```
 
 ### 2. デプロイ
@@ -163,9 +163,9 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 ### CLIENTローカルユーザー
 | ユーザー名 | パスワード | 説明 |
 |----------|----------|-------------|
-| ueda | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | CLIENT上の標準ユーザー |
+| nagata | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | CLIENT上の標準ユーザー |
 
-パスワードは `client_local_user_ueda_password` で設定できます。
+パスワードは `client_local_user_nagata_password` で設定できます。
 - Backup Operatorsグループ所属（SeBackupPrivilege / SeRestorePrivilege付与）
 - Remote Management Usersグループ所属（WinRM接続可能）
 - 標準ユーザーのため、UACによる管理者権限への昇格はできません
@@ -173,13 +173,13 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 ### ドメインユーザー
 | ユーザー名 | パスワード | RDPアクセス可能なマシン | 特殊権限 |
 |----------|----------|-------------|----------|
-| LAB\tanaka | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | DC, FILESRV | DCへのローカルログオン権限 |
+| LAB\nakanishi | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | DC, FILESRV | DCへのローカルログオン権限 |
 | LAB\hasegawa | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | FILESRVのシャットダウン権限 |
 | LAB\saitou | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | hasegawaのパスワード変更権限 |
 
-※ CLIENTはドメイン非参加のため、ローカルユーザー（Administrator, ueda）のみRDP可能
+※ CLIENTはドメイン非参加のため、ローカルユーザー（Administrator, nagata）のみRDP可能
 
-各ユーザーのパスワードは `user_password_tanaka`, `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
+各ユーザーのパスワードは `user_password_nakanishi`, `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
 
 ### ドメイン管理者
 - **ユーザー名:** LAB\Administrator
@@ -191,7 +191,7 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 |-------|------|--------|
 | \\\\FILESRV1\\Share | C:\Shares\Share | 全ドメインユーザーが読み書き可能 |
 | \\\\FILESRV1\\Public | C:\Shares\Public | ドメインユーザーは読み取り専用 |
-| \\\\FILESRV1\\Tanaka | C:\Shares\Users\Tanaka | tanakaの個人フォルダ |
+| \\\\FILESRV1\\Nakanishi | C:\Shares\Users\Nakanishi | nakanishiの個人フォルダ |
 | \\\\FILESRV1\\Hasegawa | C:\Shares\Users\Hasegawa | hasegawaの個人フォルダ |
 | \\\\FILESRV1\\Saitou | C:\Shares\Users\Saitou | saitouの個人フォルダ |
 
@@ -209,7 +209,7 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 ```
 lab.local (ドメイン)
 ├── OU=LabUsers
-│   ├── tanaka
+│   ├── nakanishi
 │   ├── hasegawa
 │   └── saitou
 ├── OU=LabComputers

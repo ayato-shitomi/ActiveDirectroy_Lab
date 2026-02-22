@@ -100,7 +100,7 @@ write_files:
       echo ""
       echo "Domain Credentials:"
       echo "  Domain: LAB"
-      echo "  Users: tanaka, hasegawa, saitou"
+      echo "  Users: nakanishi, hasegawa, saitou"
       echo ""
       echo "File Shares:"
       echo "  \\\\FILESRV1\\Share"

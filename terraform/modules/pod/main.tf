@@ -26,7 +26,7 @@ resource "aws_instance" "dc" {
     domain_password = var.domain_password
     dc_ip           = var.dc_private_ip
     computer_name   = "DC${var.pod_index}"
-    user_password_tanaka   = var.user_password_tanaka
+    user_password_nakanishi   = var.user_password_nakanishi
     user_password_hasegawa = var.user_password_hasegawa
     user_password_saitou   = var.user_password_saitou
   }))
@@ -100,7 +100,7 @@ resource "aws_instance" "client" {
     domain_netbios  = var.domain_netbios
     dc_ip           = var.dc_private_ip
     computer_name   = "CLIENT${var.pod_index}"
-    ueda_password   = var.client_local_user_ueda_password
+    nagata_password   = var.client_local_user_nagata_password
     saitou_password = var.user_password_saitou
   }))
 

@@ -67,13 +67,13 @@ output "connection_instructions" {
        - CLIENT:  Administrator / <client_admin_password or admin_password>
 
        [CLIENT Local User - Standard User (No Admin)]
-       - ueda / <client_local_user_ueda_password> (default: P@ssw0rd!)
+       - nagata / <client_local_user_nagata_password> (default: P@ssw0rd!)
 
        [Domain Administrator]
        - LAB\\Administrator / <domain_password>
 
        [Domain Users]
-       - LAB\\tanaka / <user_password_tanaka> (default: P@ssw0rd!)
+       - LAB\\nakanishi / <user_password_nakanishi> (default: P@ssw0rd!)
        - LAB\\hasegawa / <user_password_hasegawa> (default: P@ssw0rd!)
        - LAB\\saitou / <user_password_saitou> (default: P@ssw0rd!)
 

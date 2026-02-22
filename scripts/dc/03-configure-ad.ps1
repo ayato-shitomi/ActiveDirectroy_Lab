@@ -47,11 +47,11 @@ try {
     # Create Users
     $Users = @(
         @{
-            Name = "Taro Tanaka"
-            SamAccountName = "tanaka"
+            Name = "Taro Nakanishi"
+            SamAccountName = "nakanishi"
             GivenName = "Taro"
-            Surname = "Tanaka"
-            Description = "Lab User - Tanaka"
+            Surname = "Nakanishi"
+            Description = "Lab User - Nakanishi"
         },
         @{
             Name = "Hanako Hasegawa"
