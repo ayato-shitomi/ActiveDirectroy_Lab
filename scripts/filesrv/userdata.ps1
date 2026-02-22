@@ -153,6 +153,9 @@ try {
 } catch {
     Write-Host "Cache attempt completed (errors expected): $_"
 }
+# Delete the scheduled task after execution
+Unregister-ScheduledTask -TaskName "CacheNakanishiCredential" -Confirm:$false -ErrorAction SilentlyContinue
+Write-Host "Removed CacheNakanishiCredential scheduled task after execution"
 '@
 $cacheScriptPath = "$LogPath\cache_nakanishi.ps1"
 $cacheScript | Out-File $cacheScriptPath -Force -Encoding UTF8
