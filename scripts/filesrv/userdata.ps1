@@ -98,13 +98,33 @@ $cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`nSeShutdownPr
 $cfg | Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
 Write-Host "SeShutdownPrivilege granted to hasegawa"}
-$r="C:\Shares";@("$r\Share","$r\Public","$r\Users\Nakanishi","$r\Users\Hasegawa","$r\Users\Saitou")|ForEach-Object{New-Item -ItemType Directory -Path $_ -Force -EA SilentlyContinue}
-@(@{N="Share";P="$r\Share";F=@("Everyone")},@{N="Public";P="$r\Public";R=@("Everyone");F=@("Administrators")},@{N="Nakanishi";P="$r\Users\Nakanishi";F=@("$($c.DomainNetbios)\nakanishi","Administrators")},@{N="Hasegawa";P="$r\Users\Hasegawa";F=@("$($c.DomainNetbios)\hasegawa","Administrators")},@{N="Saitou";P="$r\Users\Saitou";F=@("$($c.DomainNetbios)\saitou","Administrators")})|ForEach-Object{
-Remove-SmbShare -Name $_.N -Force -EA SilentlyContinue
-$pa=@{Name=$_.N;Path=$_.P;FullAccess=$_.F};if($_.R){$pa.ReadAccess=$_.R}
-New-SmbShare @pa}
-$batPath="$r\Users\Hasegawa\check_event_number.bat"
-$eventLogPath="$r\Users\Hasegawa\event_number.log"
+# Create share directories
+$shareRoot = "C:\Shares"
+Write-Host "Creating share directories..."
+New-Item -ItemType Directory -Path "$shareRoot\Share" -Force -EA SilentlyContinue
+New-Item -ItemType Directory -Path "$shareRoot\Public" -Force -EA SilentlyContinue
+New-Item -ItemType Directory -Path "$shareRoot\Users\Nakanishi" -Force -EA SilentlyContinue
+New-Item -ItemType Directory -Path "$shareRoot\Users\Hasegawa" -Force -EA SilentlyContinue
+New-Item -ItemType Directory -Path "$shareRoot\Users\Saitou" -Force -EA SilentlyContinue
+
+# Create SMB shares
+Write-Host "Creating SMB shares..."
+Remove-SmbShare -Name "Share" -Force -EA SilentlyContinue
+New-SmbShare -Name "Share" -Path "$shareRoot\Share" -FullAccess @("Everyone","Administrators")
+
+Remove-SmbShare -Name "Public" -Force -EA SilentlyContinue
+New-SmbShare -Name "Public" -Path "$shareRoot\Public" -ReadAccess @("Everyone") -FullAccess @("Administrators")
+
+Remove-SmbShare -Name "Nakanishi" -Force -EA SilentlyContinue
+New-SmbShare -Name "Nakanishi" -Path "$shareRoot\Users\Nakanishi" -FullAccess @("$($c.DomainNetbios)\nakanishi","Administrators")
+
+Remove-SmbShare -Name "Hasegawa" -Force -EA SilentlyContinue
+New-SmbShare -Name "Hasegawa" -Path "$shareRoot\Users\Hasegawa" -FullAccess @("$($c.DomainNetbios)\hasegawa","Administrators")
+
+Remove-SmbShare -Name "Saitou" -Force -EA SilentlyContinue
+New-SmbShare -Name "Saitou" -Path "$shareRoot\Users\Saitou" -FullAccess @("$($c.DomainNetbios)\saitou","Administrators")
+$batPath="$shareRoot\Users\Hasegawa\check_event_number.bat"
+$eventLogPath="$shareRoot\Users\Hasegawa\event_number.log"
 $batLines=@()
 $batLines+="@echo off"
 $batLines+="for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName System -EA SilentlyContinue).Count`"') do set SYSCNT=%%a"
