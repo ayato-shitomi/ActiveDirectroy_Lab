@@ -17,18 +17,38 @@ $config = @{
 }
 $config | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
-# Download scripts from GitHub repository
+# Download scripts from GitHub repository with retry logic
 $baseUrl = "https://raw.githubusercontent.com/ayato-shitomi/ActiveDirectroy_Lab/refs/heads/main"
-try {
-    Write-Host "Downloading setup scripts from GitHub..."
-    Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/setup.ps1" -OutFile "$ScriptPath\setup.ps1" -UseBasicParsing
-    Write-Host "Downloaded setup.ps1"
+$downloadSuccess = $false
 
-    Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/backup_service.ps1" -OutFile "$LogPath\svc_backup.ps1" -UseBasicParsing
-    Write-Host "Downloaded backup_service.ps1"
-} catch {
-    Write-Error "Failed to download scripts: $_"
-    $_ | Out-File "$LogPath\download_error.log" -Append
+for($retry = 1; $retry -le 3; $retry++) {
+    try {
+        Write-Host "Downloading setup scripts from GitHub (attempt $retry/3)..."
+        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/setup.ps1" -OutFile "$ScriptPath\setup.ps1" -UseBasicParsing -TimeoutSec 30
+        Write-Host "Downloaded setup.ps1"
+
+        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/backup_service.ps1" -OutFile "$LogPath\svc_backup.ps1" -UseBasicParsing -TimeoutSec 30
+        Write-Host "Downloaded backup_service.ps1"
+
+        # Verify files exist and have content
+        if((Test-Path "$ScriptPath\setup.ps1") -and (Test-Path "$LogPath\svc_backup.ps1") -and
+           ((Get-Item "$ScriptPath\setup.ps1").Length -gt 0) -and ((Get-Item "$LogPath\svc_backup.ps1").Length -gt 0)) {
+            $downloadSuccess = $true
+            Write-Host "All scripts downloaded successfully"
+            break
+        }
+    } catch {
+        Write-Warning "Download attempt $retry failed: $_"
+        $_ | Out-File "$LogPath\download_error.log" -Append
+        if($retry -lt 3) { Start-Sleep 10 }
+    }
+}
+
+if(-not $downloadSuccess) {
+    Write-Error "Failed to download required scripts after 3 attempts. Deployment cannot continue."
+    "$(Get-Date): CRITICAL - Script download failed, deployment aborted" | Out-File "$LogPath\deployment_failure.log" -Append
+    Stop-Transcript
+    exit 1
 }
 
 # Create main scheduled task
@@ -40,7 +60,8 @@ $mainSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopI
 Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue
 Register-ScheduledTask -TaskName "ADSetup" -Action $mainAction -Trigger $mainTrigger -Principal $mainPrincipal -Settings $mainSettings -Force
 
-# Run setup immediately
+# Run setup only if download was successful
+Write-Host "Starting setup execution..."
 & "$ScriptPath\setup.ps1"
 Stop-Transcript
 </powershell>
