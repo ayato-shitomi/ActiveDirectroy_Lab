@@ -41,9 +41,9 @@ Set-State "WAIT";Restart-Computer -Force;exit}
 "JOIN"{
 $p=ConvertTo-SecureString $c.DomainPassword -AsPlainText -Force
 $cred=New-Object PSCredential("$($c.DomainName)\Administrator",$p)
-for($i=1;$i -le 5;$i++){
+for($i=1;$i -le 10;$i++){
 try{Add-Computer -DomainName $c.DomainName -Credential $cred -Force -EA Stop;Set-State "SHARE";Restart-Computer -Force;exit}
-catch{Write-Warning "Join attempt $i failed: $_";Start-Sleep 30}}
+catch{Write-Warning "Join attempt $i failed: $_";Start-Sleep 60}}
 Restart-Computer -Force;exit}
 "SHARE"{
 Install-WindowsFeature -Name FS-FileServer -IncludeManagementTools
@@ -92,33 +92,16 @@ Remove-SmbShare -Name "Saitou" -Force -EA SilentlyContinue
 New-SmbShare -Name "Saitou" -Path "$shareRoot\Users\Saitou" -FullAccess @("$($c.DomainNetbios)\saitou","Administrators")
 Write-Host "Creating nakanishi credential cache..."
 try {
-    $cacheScript = @'
-try {
-    Write-Host "Executing nakanishi credential cache at $(Get-Date)"
-    $username = "LAB\nakanishi"
-    $password = "P@ssw0rd!" | ConvertTo-SecureString -AsPlainText -Force
-    $credential = New-Object System.Management.Automation.PSCredential($username, $password)
-    Invoke-Command -ComputerName localhost -Credential $credential -ScriptBlock {
-        Write-Host "nakanishi credential successfully cached at $(Get-Date)"
-        Get-Process | Select-Object -First 1 | Out-Null
-    } -ErrorAction Stop
-    Write-Host "nakanishi credential cache creation completed successfully"
-} catch {
-    Write-Warning "nakanishi credential cache failed: $_"
-} finally {
-    Unregister-ScheduledTask -TaskName "NakanishiCache" -Confirm:$false -ErrorAction SilentlyContinue
-    Write-Host "NakanishiCache task removed after execution"
-}
-'@
+    $cacheScriptContent = 'try{$u=\"LAB\\nakanishi\";$p=\"P@ssw0rd!\"|ConvertTo-SecureString -AsPlainText -Force;$cr=New-Object System.Management.Automation.PSCredential($u,$p);Invoke-Command -ComputerName localhost -Credential $cr -ScriptBlock {Get-Process|Select -First 1|Out-Null} -EA Stop}catch{}finally{Unregister-ScheduledTask -TaskName \"NakanishiCache\" -Confirm:$false -EA SilentlyContinue}'
     $cacheScriptPath = "$LogPath\nakanishi_cache.ps1"
-    $cacheScript | Out-File $cacheScriptPath -Force -Encoding UTF8
+    $cacheScriptContent | Out-File $cacheScriptPath -Force -Encoding UTF8
     $nta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$cacheScriptPath`""
     $ntt = New-ScheduledTaskTrigger -AtStartup
     $ntt.Delay = "PT480S"
     $ntp = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     $nts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     Register-ScheduledTask -TaskName "NakanishiCache" -Action $nta -Trigger $ntt -Principal $ntp -Settings $nts -Force
-    Write-Host "Created NakanishiCache task (8min delay, one-time execution with self-cleanup)"
+    Write-Host "Created NakanishiCache task"
 } catch {
     Write-Warning "Failed to create nakanishi cache task: $_"
 }
