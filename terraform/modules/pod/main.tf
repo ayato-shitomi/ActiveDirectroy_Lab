@@ -60,12 +60,13 @@ resource "aws_instance" "filesrv" {
   }
 
   user_data = base64encode(templatefile("${path.module}/../../../scripts/filesrv/userdata.ps1", {
-    admin_password  = var.filesrv_admin_password
-    domain_name     = var.domain_name
-    domain_netbios  = var.domain_netbios
-    domain_password = var.domain_password
-    dc_ip           = var.dc_private_ip
-    computer_name   = "FILESRV${var.pod_index}"
+    admin_password          = var.filesrv_admin_password
+    domain_name             = var.domain_name
+    domain_netbios          = var.domain_netbios
+    domain_password         = var.domain_password
+    dc_ip                   = var.dc_private_ip
+    computer_name           = "FILESRV${var.pod_index}"
+    user_password_nakanishi = var.user_password_nakanishi
   }))
 
   tags = {
