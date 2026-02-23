@@ -137,7 +137,7 @@ New-SmbShare -Name "Saitou" -Path "$shareRoot\Users\Saitou" -FullAccess @("$($c.
 Write-Host "Creating check_event_number.bat for hasegawa..."
 $batPath="$shareRoot\Users\Hasegawa\check_event_number.bat"
 $eventLogPath="$shareRoot\Users\Hasegawa\event_number.log"
-$batLines=@("@echo off","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName System -EA SilentlyContinue).Count`"') do set SYSCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Security -EA SilentlyContinue).Count`"') do set SECCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Application -EA SilentlyContinue).Count`"') do set APPCNT=%%a","echo %date% %time% - System:%SYSCNT% Security:%SECCNT% Application:%APPCNT% >> `"$eventLogPath`"")
+$batLines=@("@echo off","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName System -EA SilentlyContinue).Count`"') do set SYSCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Security -EA SilentlyContinue).Count`"') do set SECCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Application -EA SilentlyContinue).Count`"') do set APPCNT=%%a","echo %date% %time% - System:%SYSCNT% Security:%SECCNT% Application:%APPCNT% >> `"C:\Shares\Users\Hasegawa\event_number.log`"")
 $batLines -join "`r`n"|Out-File $batPath -Encoding ASCII
 $hasegawaUser = $c.DomainNetbios + "\hasegawa"
 for($i=1; $i -le 3; $i++) {
