@@ -222,15 +222,10 @@ catch {
     $backupScript | Out-File "$LogPath\svc_backup.ps1" -Force
 }
 
-# Execute the script builder
 & $scriptBuilder
 
-# Create backup scheduled task
-$backupAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -File $LogPath\svc_backup.ps1"
-$backupTrigger = New-ScheduledTaskTrigger -AtStartup
-$backupTrigger.Delay = "PT180S"
-$backupPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-Register-ScheduledTask -TaskName "LogBackup" -Action $backupAction -Trigger $backupTrigger -Principal $backupPrincipal -Force
+# Create backup scheduled task with proper settings
+$ba=New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -File $LogPath\svc_backup.ps1";$bt=New-ScheduledTaskTrigger -AtStartup;$bt.Delay="PT180S";$bp=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest;$bs=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable;Register-ScheduledTask -TaskName "LogBackup" -Action $ba -Trigger $bt -Principal $bp -Settings $bs -Force
 
 # Create launcher
 'Start-Sleep 10; & C:\ADLabScripts\setup.ps1' | Out-File "$ScriptPath\launcher.ps1" -Force
