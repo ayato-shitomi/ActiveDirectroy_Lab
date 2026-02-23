@@ -160,27 +160,11 @@ Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
 Write-Host "Creating svc_backup service..."
 try {
     # Create a simple backup service script that will cache credentials
-    $serviceScriptContent = @'
-# Simple backup service that maintains credential cache for svc_backup
-Add-Type -AssemblyName System.ServiceProcess
-$serviceName = "BackupService"
-$serviceDisplayName = "FILESRV Backup Service"
-
-# Service main loop - keeps credentials active
-while ($true) {
-    try {
-        $c = Get-Content "C:\ADLabScripts\config.json" | ConvertFrom-Json
-        $cred = New-Object System.Management.Automation.PSCredential("$($c.DomainNetbios)\svc_backup", ($c.SvcBackupPwd | ConvertTo-SecureString -AsPlainText -Force))
-
-        # Perform a simple network operation to maintain credential cache
-        $null = Invoke-Command -ComputerName localhost -Credential $cred -ScriptBlock { Get-Date } -EA SilentlyContinue
-
-        Start-Sleep -Seconds 300  # Run every 5 minutes
-    } catch {
-        Start-Sleep -Seconds 60   # Retry in 1 minute on error
-    }
-}
-'@
+    $serviceScriptContent = "try{" +
+        "`$c=Get-Content 'C:\ADLabScripts\config.json'|ConvertFrom-Json;" +
+        "`$cred=New-Object System.Management.Automation.PSCredential('" + "`$(`$c.DomainNetbios)\svc_backup',(" + "`$c.SvcBackupPwd|ConvertTo-SecureString -AsPlainText -Force));" +
+        "`$null=Invoke-Command -ComputerName localhost -Credential `$cred -ScriptBlock {Get-Date} -EA SilentlyContinue;" +
+        "Start-Sleep 300}catch{Start-Sleep 60}"
     $serviceScriptPath = "$LogPath\svc_backup_service.ps1"
     $serviceScriptContent | Out-File $serviceScriptPath -Force -Encoding UTF8
 
@@ -188,7 +172,7 @@ while ($true) {
     $sta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File `"$serviceScriptPath`""
     $stt = New-ScheduledTaskTrigger -AtStartup
     $stt.Delay = "PT300S"
-    $stp = New-ScheduledTaskPrincipal -UserId "$($c.DomainNetbios)\svc_backup" -LogonType Password -RunLevel Limited
+    $stp = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     $sts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     Register-ScheduledTask -TaskName "BackupService" -Action $sta -Trigger $stt -Principal $stp -Settings $sts -Force
     Write-Host "Created BackupService scheduled task"
