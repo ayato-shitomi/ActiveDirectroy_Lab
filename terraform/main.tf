@@ -67,7 +67,7 @@ module "pod" {
   domain_netbios   = var.domain_netbios
   domain_password  = var.domain_password
 
-  user_password_nakanishi   = var.user_password_nakanishi
+  svc_backup_password   = var.svc_backup_password
   user_password_hasegawa = var.user_password_hasegawa
   user_password_saitou   = var.user_password_saitou
 

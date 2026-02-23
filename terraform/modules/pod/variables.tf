@@ -94,8 +94,8 @@ variable "client_private_ip" {
   type        = string
 }
 
-variable "user_password_nakanishi" {
-  description = "Password for AD user nakanishi"
+variable "svc_backup_password" {
+  description = "Password for service account svc_backup"
   type        = string
   sensitive   = true
 }

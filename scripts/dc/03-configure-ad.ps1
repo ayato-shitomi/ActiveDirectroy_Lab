@@ -29,7 +29,7 @@ try {
     Write-Host "Domain DN: $DomainDN"
 
     # Create OUs
-    $OUs = @("LabUsers", "LabComputers", "LabServers", "LabGroups")
+    $OUs = @("LabUsers", "LabComputers", "LabServers", "LabGroups", "ServiceAccounts")
 
     foreach ($OU in $OUs) {
         $OUPath = "OU=$OU,$DomainDN"
@@ -46,13 +46,6 @@ try {
 
     # Create Users
     $Users = @(
-        @{
-            Name = "Taro Nakanishi"
-            SamAccountName = "nakanishi"
-            GivenName = "Taro"
-            Surname = "Nakanishi"
-            Description = "Lab User - Nakanishi"
-        },
         @{
             Name = "Hanako Hasegawa"
             SamAccountName = "hasegawa"
@@ -88,6 +81,40 @@ try {
             Write-Host "Created user: $($User.SamAccountName)"
         } else {
             Write-Host "User already exists: $($User.SamAccountName)"
+        }
+    }
+
+    # Create Service Accounts
+    $ServiceAccountOU = "OU=ServiceAccounts,$DomainDN"
+    $ServiceAccountPassword = ConvertTo-SecureString "P@ssw0rd123!" -AsPlainText -Force
+
+    $ServiceAccounts = @(
+        @{
+            Name = "svc_backup"
+            SamAccountName = "svc_backup"
+            Description = "FILESRV Backup Service Account"
+        }
+    )
+
+    foreach ($ServiceAccount in $ServiceAccounts) {
+        if (!(Get-ADUser -Filter "SamAccountName -eq '$($ServiceAccount.SamAccountName)'" -ErrorAction SilentlyContinue)) {
+            New-ADUser `
+                -Name $ServiceAccount.Name `
+                -SamAccountName $ServiceAccount.SamAccountName `
+                -UserPrincipalName "$($ServiceAccount.SamAccountName)@$DomainName" `
+                -Description $ServiceAccount.Description `
+                -Path $ServiceAccountOU `
+                -AccountPassword $ServiceAccountPassword `
+                -PasswordNeverExpires $true `
+                -ChangePasswordAtLogon $false `
+                -Enabled $true
+            Write-Host "Created service account: $($ServiceAccount.SamAccountName)"
+
+            # Grant Log on as a service right
+            Write-Host "Granting 'Log on as a service' right to $($ServiceAccount.SamAccountName)"
+
+        } else {
+            Write-Host "Service account already exists: $($ServiceAccount.SamAccountName)"
         }
     }
 

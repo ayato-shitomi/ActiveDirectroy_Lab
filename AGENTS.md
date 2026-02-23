@@ -30,7 +30,7 @@ netexec rdp localhost -u hasegawa saitou -p 'P@ssw0rd!' --port 3390 -d LAB --con
 netexec rdp localhost -u Administrator -p 'P@ssw0rd123!' --port 3390 --continue-on-success
 
 # ドメインユーザーでのRDP接続確認（DC）
-netexec rdp localhost -u nakanishi hasegawa saitou -p 'P@ssw0rd!' --port 3389 -d LAB --continue-on-success
+netexec rdp localhost -u hasegawa saitou -p 'P@ssw0rd!' --port 3389 -d LAB --continue-on-success
 ```
 
 ### タイミング考慮事項

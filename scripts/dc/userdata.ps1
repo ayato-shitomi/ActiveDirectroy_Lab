@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Path $LogPath, $ScriptPath -Force -EA SilentlyCont
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
 # Save config
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";UserPwdNakanishi="${user_password_nakanishi}";UserPwdHasegawa="${user_password_hasegawa}";UserPwdSaitou="${user_password_saitou}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";UserPwdHasegawa="${user_password_hasegawa}";UserPwdSaitou="${user_password_saitou}";SvcBackupPwd="${svc_backup_password}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
 # Setup script content
 $s = @'
@@ -63,32 +63,33 @@ if(-not $adReady){Write-Warning "AD not ready after 10 min, restarting...";Resta
 Open-FW;$dn=(Get-ADDomain).DistinguishedName
 @("LabUsers","LabComputers","LabServers","LabGroups")|ForEach-Object{if(!(Get-ADOrganizationalUnit -Filter "Name -eq '$_'" -EA SilentlyContinue)){New-ADOrganizationalUnit -Name $_ -Path $dn -ProtectedFromAccidentalDeletion $false}}
 $ou="OU=LabUsers,$dn"
-@(@{n="nakanishi";fn="Taro";ln="Nakanishi";p=$c.UserPwdNakanishi},@{n="hasegawa";fn="Hanako";ln="Hasegawa";p=$c.UserPwdHasegawa},@{n="saitou";fn="Jiro";ln="Saitou";p=$c.UserPwdSaitou})|ForEach-Object{
+@(@{n="hasegawa";fn="Hanako";ln="Hasegawa";p=$c.UserPwdHasegawa},@{n="saitou";fn="Jiro";ln="Saitou";p=$c.UserPwdSaitou})|ForEach-Object{
 if(!(Get-ADUser -Filter "SamAccountName -eq '$($_.n)'" -EA SilentlyContinue)){
 $sp=ConvertTo-SecureString $_.p -AsPlainText -Force
 New-ADUser -Name "$($_.fn) $($_.ln)" -SamAccountName $_.n -UserPrincipalName "$($_.n)@$($c.DomainName)" -GivenName $_.fn -Surname $_.ln -Path $ou -AccountPassword $sp -PasswordNeverExpires $true -Enabled $true}}
+$saou="OU=ServiceAccounts,$dn"
+if(!(Get-ADOrganizationalUnit -Filter "DistinguishedName -eq '$saou'" -EA SilentlyContinue)){New-ADOrganizationalUnit -Name "ServiceAccounts" -Path $dn}
+if(!(Get-ADUser -Filter "SamAccountName -eq 'svc_backup'" -EA SilentlyContinue)){
+$sasp=ConvertTo-SecureString $c.SvcBackupPwd -AsPlainText -Force
+New-ADUser -Name "svc_backup" -SamAccountName "svc_backup" -UserPrincipalName "svc_backup@$($c.DomainName)" -Path $saou -AccountPassword $sasp -PasswordNeverExpires $true -Enabled $true -Description "FILESRV Backup Service Account"}
 $go="OU=LabGroups,$dn"
 if(!(Get-ADGroup -Filter "Name -eq 'GG_Lab_Users'" -EA SilentlyContinue)){New-ADGroup -Name "GG_Lab_Users" -SamAccountName "GG_Lab_Users" -GroupCategory Security -GroupScope Global -Path $go}
-@("nakanishi","hasegawa","saitou")|ForEach-Object{Add-ADGroupMember -Identity "GG_Lab_Users" -Members $_ -EA SilentlyContinue}
+@("hasegawa","saitou")|ForEach-Object{Add-ADGroupMember -Identity "GG_Lab_Users" -Members $_ -EA SilentlyContinue}
 $hasegawaDN=(Get-ADUser hasegawa).DistinguishedName
 dsacls $hasegawaDN /G "$($c.DomainNetbios)\saitou:CA;Reset Password"|Out-Null
 Write-Host "Granted saitou permission to reset hasegawa password"
-# Grant nakanishi local logon right and RDP access to DC
-$nakanishiUser=$c.DomainNetbios+"\nakanishi"
-Add-LocalGroupMember -Group "Remote Desktop Users" -Member $nakanishiUser -EA SilentlyContinue
-Add-LocalGroupMember -Group "Remote Management Users" -Member $nakanishiUser -EA SilentlyContinue
-Write-Host "Added nakanishi to Remote Desktop Users and Remote Management Users on DC"
-$nakanishiSid=(Get-ADUser nakanishi).SID.Value
-$tmpCfg="$LogPath\secpol_logon.cfg";$tmpDb="$LogPath\secedit_logon.sdb"
+# Configure svc_backup service account with Log on as a service right
+$svcBackupSid=(Get-ADUser svc_backup).SID.Value
+$tmpCfg="$LogPath\secpol_service.cfg";$tmpDb="$LogPath\secedit_service.sdb"
 secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
 $cfg=Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
-if($cfg -match 'SeInteractiveLogonRight\s*=\s*(.*)'){
+if($cfg -match 'SeServiceLogonRight\s*=\s*(.*)'){
 $cur=$matches[1].Trim()
-if($cur -notmatch $nakanishiSid){$cfg=$cfg -replace 'SeInteractiveLogonRight\s*=\s*.*',"SeInteractiveLogonRight = $cur,*$nakanishiSid"}
-}else{$cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`nSeInteractiveLogonRight = *$nakanishiSid"}
+if($cur -notmatch $svcBackupSid){$cfg=$cfg -replace 'SeServiceLogonRight\s*=\s*.*',"SeServiceLogonRight = $cur,*$svcBackupSid"}
+}else{$cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`nSeServiceLogonRight = *$svcBackupSid"}
 $cfg|Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
-Write-Host "Granted nakanishi local logon right to DC"
+Write-Host "Granted svc_backup 'Log on as a service' right"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

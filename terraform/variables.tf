@@ -139,11 +139,11 @@ variable "domain_password" {
 }
 
 # AD User Passwords
-variable "user_password_nakanishi" {
-  description = "Password for AD user nakanishi"
+variable "svc_backup_password" {
+  description = "Password for service account svc_backup"
   type        = string
   sensitive   = true
-  default     = "P@ssw0rd!"
+  default     = "P@ssw0rd123!"
 }
 
 variable "user_password_hasegawa" {

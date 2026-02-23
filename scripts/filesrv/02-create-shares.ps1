@@ -43,12 +43,6 @@ try {
             FullAccess = @("$DomainNetbios\Domain Admins")
         },
         @{
-            Name = "Nakanishi"
-            Path = "$ShareRoot\Users\Nakanishi"
-            Description = "Personal folder for Nakanishi"
-            FullAccess = @("$DomainNetbios\nakanishi", "$DomainNetbios\Domain Admins")
-        },
-        @{
             Name = "Hasegawa"
             Path = "$ShareRoot\Users\Hasegawa"
             Description = "Personal folder for Hasegawa"
@@ -153,7 +147,6 @@ try {
 
     "This is a shared file. Everyone can read and write." | Out-File "$ShareRoot\Share\readme.txt"
     "This is a public file. Read-only for domain users." | Out-File "$ShareRoot\Public\readme.txt"
-    "Nakanishi's personal folder" | Out-File "$ShareRoot\Users\Nakanishi\readme.txt"
     "Hasegawa's personal folder" | Out-File "$ShareRoot\Users\Hasegawa\readme.txt"
     "Saitou's personal folder" | Out-File "$ShareRoot\Users\Saitou\readme.txt"
 

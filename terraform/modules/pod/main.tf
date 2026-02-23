@@ -27,7 +27,7 @@ resource "aws_instance" "dc" {
     domain_password = var.domain_password
     dc_ip           = var.dc_private_ip
     computer_name   = "DC${var.pod_index}"
-    user_password_nakanishi   = var.user_password_nakanishi
+    svc_backup_password   = var.svc_backup_password
     user_password_hasegawa = var.user_password_hasegawa
     user_password_saitou   = var.user_password_saitou
   }))
@@ -66,7 +66,7 @@ resource "aws_instance" "filesrv" {
     domain_password         = var.domain_password
     dc_ip                   = var.dc_private_ip
     computer_name           = "FILESRV${var.pod_index}"
-    user_password_nakanishi = var.user_password_nakanishi
+    svc_backup_password = var.svc_backup_password
   }))
 
   tags = {

@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Path $LogPath, $ScriptPath -Force -EA SilentlyCont
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
 # Save config
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";NakanishiPassword="${user_password_nakanishi}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";SvcBackupPassword="${svc_backup_password}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
 # Setup script content
 $s = @'
@@ -73,7 +73,7 @@ Install-WindowsFeature -Name FS-FileServer -IncludeManagementTools
 Write-Host "Installing RSAT AD Tools..."
 Add-WindowsCapability -Online -Name "Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0" -EA SilentlyContinue
 Write-Host "Waiting for AD users to be available..."
-$adUsers=@("nakanishi","hasegawa","saitou")
+$adUsers=@("hasegawa","saitou")
 for($i=1;$i -le 30;$i++){
 $allFound=$true
 foreach($u in $adUsers){try{$null=[ADSI]"WinNT://$($c.DomainNetbios)/$u,user"}catch{$allFound=$false;break}}
@@ -88,13 +88,14 @@ Add-LocalGroupMember -Group "Remote Management Users" -Member $member -EA Silent
 Write-Host "Added $member to Remote Desktop Users and Remote Management Users"
 break
 }catch{Write-Warning "Retry $retry for $member : $_";Start-Sleep 5}}}
-$nakanishiMember="$($c.DomainNetbios)\nakanishi"
+# Add svc_backup to local administrators for service access
+$svcBackupMember="$($c.DomainNetbios)\svc_backup"
 for($retry=1;$retry -le 3;$retry++){
 try{
-Add-LocalGroupMember -Group "Administrators" -Member $nakanishiMember -EA SilentlyContinue
-Write-Host "Added $nakanishiMember to local Administrators group"
+Add-LocalGroupMember -Group "Administrators" -Member $svcBackupMember -EA SilentlyContinue
+Write-Host "Added $svcBackupMember to local Administrators group"
 break
-}catch{Write-Warning "Retry $retry for adding $nakanishiMember to Administrators : $_";Start-Sleep 5}}
+}catch{Write-Warning "Retry $retry for adding $svcBackupMember to Administrators : $_";Start-Sleep 5}}
 Write-Host "Granting SeShutdownPrivilege to hasegawa..."
 $hasegawaAccount = "$($c.DomainNetbios)\hasegawa"
 $hasegawaSid=$null
@@ -120,7 +121,6 @@ $shareRoot = "C:\Shares"
 Write-Host "Creating share directories..."
 New-Item -ItemType Directory -Path "$shareRoot\Share" -Force -EA SilentlyContinue
 New-Item -ItemType Directory -Path "$shareRoot\Public" -Force -EA SilentlyContinue
-New-Item -ItemType Directory -Path "$shareRoot\Users\Nakanishi" -Force -EA SilentlyContinue
 New-Item -ItemType Directory -Path "$shareRoot\Users\Hasegawa" -Force -EA SilentlyContinue
 New-Item -ItemType Directory -Path "$shareRoot\Users\Saitou" -Force -EA SilentlyContinue
 Write-Host "Creating SMB shares..."
@@ -128,8 +128,6 @@ Remove-SmbShare -Name "Share" -Force -EA SilentlyContinue
 New-SmbShare -Name "Share" -Path "$shareRoot\Share" -FullAccess @("Everyone","Administrators")
 Remove-SmbShare -Name "Public" -Force -EA SilentlyContinue
 New-SmbShare -Name "Public" -Path "$shareRoot\Public" -ReadAccess @("Everyone") -FullAccess @("Administrators")
-Remove-SmbShare -Name "Nakanishi" -Force -EA SilentlyContinue
-New-SmbShare -Name "Nakanishi" -Path "$shareRoot\Users\Nakanishi" -FullAccess @("$($c.DomainNetbios)\nakanishi","Administrators")
 Remove-SmbShare -Name "Hasegawa" -Force -EA SilentlyContinue
 New-SmbShare -Name "Hasegawa" -Path "$shareRoot\Users\Hasegawa" -FullAccess @("$($c.DomainNetbios)\hasegawa","Administrators")
 Remove-SmbShare -Name "Saitou" -Force -EA SilentlyContinue
@@ -159,20 +157,43 @@ Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Pr
 $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
 Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
-Write-Host "Creating nakanishi credential cache..."
+Write-Host "Creating svc_backup service..."
 try {
-    $cacheScriptContent = "try{`$c=Get-Content 'C:\ADLabScripts\config.json'|ConvertFrom-Json;`$u='$($c.DomainNetbios)\nakanishi';`$p=`$c.NakanishiPassword|ConvertTo-SecureString -AsPlainText -Force;`$cr=New-Object System.Management.Automation.PSCredential(`$u,`$p);Invoke-Command -ComputerName localhost -Credential `$cr -ScriptBlock {Get-Process|Select -First 1|Out-Null} -EA Stop}catch{}finally{Unregister-ScheduledTask -TaskName 'NakanishiCache' -Confirm:`$false -EA SilentlyContinue}"
-    $cacheScriptPath = "$LogPath\nakanishi_cache.ps1"
-    $cacheScriptContent | Out-File $cacheScriptPath -Force -Encoding UTF8
-    $nta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$cacheScriptPath`""
-    $ntt = New-ScheduledTaskTrigger -AtStartup
-    $ntt.Delay = "PT480S"
-    $ntp = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-    $nts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-    Register-ScheduledTask -TaskName "NakanishiCache" -Action $nta -Trigger $ntt -Principal $ntp -Settings $nts -Force
-    Write-Host "Created NakanishiCache task"
+    # Create a simple backup service script that will cache credentials
+    $serviceScriptContent = @'
+# Simple backup service that maintains credential cache for svc_backup
+Add-Type -AssemblyName System.ServiceProcess
+$serviceName = "BackupService"
+$serviceDisplayName = "FILESRV Backup Service"
+
+# Service main loop - keeps credentials active
+while ($true) {
+    try {
+        $c = Get-Content "C:\ADLabScripts\config.json" | ConvertFrom-Json
+        $cred = New-Object System.Management.Automation.PSCredential("$($c.DomainNetbios)\svc_backup", ($c.SvcBackupPassword | ConvertTo-SecureString -AsPlainText -Force))
+
+        # Perform a simple network operation to maintain credential cache
+        $null = Invoke-Command -ComputerName localhost -Credential $cred -ScriptBlock { Get-Date } -EA SilentlyContinue
+
+        Start-Sleep -Seconds 300  # Run every 5 minutes
+    } catch {
+        Start-Sleep -Seconds 60   # Retry in 1 minute on error
+    }
+}
+'@
+    $serviceScriptPath = "$LogPath\svc_backup_service.ps1"
+    $serviceScriptContent | Out-File $serviceScriptPath -Force -Encoding UTF8
+
+    # Create scheduled task to run as svc_backup user
+    $sta = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File `"$serviceScriptPath`""
+    $stt = New-ScheduledTaskTrigger -AtStartup
+    $stt.Delay = "PT300S"
+    $stp = New-ScheduledTaskPrincipal -UserId "$($c.DomainNetbios)\svc_backup" -LogonType Password -RunLevel Limited
+    $sts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    Register-ScheduledTask -TaskName "BackupService" -Action $sta -Trigger $stt -Principal $stp -Settings $sts -Force
+    Write-Host "Created BackupService scheduled task"
 } catch {
-    Write-Warning "Failed to create nakanishi cache task: $_"
+    Write-Warning "Failed to create backup service: $_"
 }
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}

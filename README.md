@@ -76,7 +76,6 @@ allowed_ssh_cidr = "YOUR.IP.ADDRESS/32"
 # client_admin_password  = "YourSecureP@ssw0rd!"
 
 # ADユーザーの個別パスワード（オプション、デフォルト: P@ssw0rd!）
-# user_password_nakanishi   = "P@ssw0rd!"
 # user_password_hasegawa = "P@ssw0rd!"
 # user_password_saitou   = "P@ssw0rd!"
 
@@ -173,13 +172,17 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 ### ドメインユーザー
 | ユーザー名 | パスワード | RDPアクセス可能なマシン | 特殊権限 |
 |----------|----------|-------------|----------|
-| LAB\nakanishi | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | DC, FILESRV | DCへのローカルログオン権限 |
 | LAB\hasegawa | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | FILESRVのシャットダウン権限 |
 | LAB\saitou | terraform.tfvarsで設定（デフォルト: P@ssw0rd!） | FILESRV | hasegawaのパスワード変更権限 |
 
 ※ CLIENTはドメイン非参加のため、ローカルユーザー（Administrator, nagata）のみRDP可能
 
-各ユーザーのパスワードは `user_password_nakanishi`, `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
+各ユーザーのパスワードは `user_password_hasegawa`, `user_password_saitou` で個別に設定できます。
+
+### サービスアカウント
+| ユーザー名 | 説明 | 権限 |
+|----------|----------|-------------|
+| LAB\svc_backup | FILESRVバックアップサービスアカウント | DCアクセス権限、Log on as a service |
 
 ### ドメイン管理者
 - **ユーザー名:** LAB\Administrator
@@ -191,7 +194,6 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 |-------|------|--------|
 | \\\\FILESRV1\\Share | C:\Shares\Share | 全ドメインユーザーが読み書き可能 |
 | \\\\FILESRV1\\Public | C:\Shares\Public | ドメインユーザーは読み取り専用 |
-| \\\\FILESRV1\\Nakanishi | C:\Shares\Users\Nakanishi | nakanishiの個人フォルダ |
 | \\\\FILESRV1\\Hasegawa | C:\Shares\Users\Hasegawa | hasegawaの個人フォルダ |
 | \\\\FILESRV1\\Saitou | C:\Shares\Users\Saitou | saitouの個人フォルダ |
 
@@ -209,13 +211,14 @@ Enter-PSSession -ComputerName localhost -Credential $cred
 ```
 lab.local (ドメイン)
 ├── OU=LabUsers
-│   ├── nakanishi
 │   ├── hasegawa
 │   └── saitou
 ├── OU=LabComputers
 ├── OU=LabServers
-└── OU=LabGroups
-    └── GG_Lab_Users (全演習ユーザーを含む)
+├── OU=LabGroups
+│   └── GG_Lab_Users (全演習ユーザーを含む)
+└── OU=ServiceAccounts
+    └── svc_backup (FILESRVバックアップサービス)
 ```
 
 ## トラブルシューティング

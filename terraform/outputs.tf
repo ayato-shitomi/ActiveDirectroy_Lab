@@ -73,9 +73,11 @@ output "connection_instructions" {
        - LAB\\Administrator / <domain_password>
 
        [Domain Users]
-       - LAB\\nakanishi / <user_password_nakanishi> (default: P@ssw0rd!)
        - LAB\\hasegawa / <user_password_hasegawa> (default: P@ssw0rd!)
        - LAB\\saitou / <user_password_saitou> (default: P@ssw0rd!)
+
+       [Service Accounts]
+       - LAB\\svc_backup / <svc_backup_password> (default: P@ssw0rd123!)
 
     5. Test file shares:
        \\\\FILESRV${length(module.pod) > 0 ? "1" : ""}\\Share
