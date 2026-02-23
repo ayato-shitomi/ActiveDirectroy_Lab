@@ -153,7 +153,7 @@ for($i=1; $i -le 3; $i++) {
     }
 }
 $ta=New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$batPath`""
-$tt=New-ScheduledTaskTrigger -AtStartup;$tt.Delay="PT120S"
+$tt=New-ScheduledTaskTrigger -AtStartup;$tt.Delay="PT60S"
 $tp=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 $ts=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Principal $tp -Settings $ts -Force
