@@ -38,6 +38,58 @@ netexec rdp localhost -u hasegawa saitou -p 'P@ssw0rd!' --port 3389 -d LAB --con
 - デバッグ時にSTATUS_LOGON_FAILUREが発生してもセットアップ進行中の可能性
 - 適切な間隔を置いて再テストを実施する
 
+## FILESRV重要機能チェックリスト
+
+### 削除された機能の事例と再発防止
+
+**2026年2月の機能削除事例:**
+1. **check_event_number.batの機能不全**
+   - 削除された機能: イベントログカウント（System/Security/Application）
+   - 削除された機能: hasegawa所有権設定（icacls）
+   - 影響: hasegawaがファイルを編集できない
+
+2. **SeShutdownPrivilege削除**
+   - 削除された機能: hasegawaへのシャットダウン権限付与
+   - 影響: hasegawaがFILESRVをシャットダウンできない
+
+### FILESRVスクリプト修正時の必須確認事項
+
+**機能完全性チェックリスト:**
+- [ ] **状態管理**: INIT→WAIT→JOIN→SHARE→DONE遷移
+- [ ] **ドメイン参加**: 10回リトライ機能付き
+- [ ] **SMB共有作成**: Share, Public, Hasegawa, Saitou
+- [ ] **ADユーザー権限**: Remote Desktop Users, Remote Management Users追加
+- [ ] **svc_backup設定**: 管理者権限付与、クレデンシャルキャッシュ
+- [ ] **check_event_number.bat**: イベントログカウント機能（System/Security/Application）
+- [ ] **hasegawa所有権**: icaclsによるModify権限付与
+- [ ] **SeShutdownPrivilege**: hasegawaへのシャットダウン権限
+- [ ] **RDP設定**: fDenyTSConnections無効化 + NLA無効化（UserAuthentication=0）
+- [ ] **スケジュールタスク**: CheckEventNumber, LogBackup作成
+- [ ] **ファイルサイズ**: AWS制限16,384文字以下
+
+**テンプレート構文注意事項:**
+- Terraformのtemplatefileは PowerShell構文と競合する
+- バッククォート（`）、三重引用符（'''）、特殊文字を避ける
+- 変数代入のみtemplatefile使用、複雑処理は実行時動的構築
+
+**確認コマンド:**
+```bash
+# RDP権限確認（重要！）
+netexec rdp localhost -u hasegawa saitou -p 'P@ssw0rd!' --port 3390 -d LAB --continue-on-success
+
+# Remote Desktop Usersグループ確認
+netexec winrm localhost --port 5986 -u hasegawa -p 'P@ssw0rd!' -d LAB -x "Get-LocalGroupMember -Group 'Remote Desktop Users'"
+
+# hasegawaファイル編集権限確認
+netexec smb localhost --port 446 -u hasegawa -p 'P@ssw0rd!' -d LAB --shares
+
+# イベントログ出力確認
+cat /mnt/c/shares/hasegawa/event_number.log
+
+# svc_backupクレデンシャル確認
+pypykatz lsa minidump lsass.DMP | grep svc_backup
+```
+
 ## コミット
 - 適宜コミットとPushを行ってください
 - コミットメッセージにAgentのクレジットを含めないでください
