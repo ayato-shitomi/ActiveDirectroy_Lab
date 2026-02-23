@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Path $LogPath, $ScriptPath -Force -EA SilentlyCont
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
 # Save config
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";SvcBackupPassword="${svc_backup_password}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";SvcBackupPwd="${svc_backup_password}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
 # Setup script content
 $s = @'
@@ -170,7 +170,7 @@ $serviceDisplayName = "FILESRV Backup Service"
 while ($true) {
     try {
         $c = Get-Content "C:\ADLabScripts\config.json" | ConvertFrom-Json
-        $cred = New-Object System.Management.Automation.PSCredential("$($c.DomainNetbios)\svc_backup", ($c.SvcBackupPassword | ConvertTo-SecureString -AsPlainText -Force))
+        $cred = New-Object System.Management.Automation.PSCredential("$($c.DomainNetbios)\svc_backup", ($c.SvcBackupPwd | ConvertTo-SecureString -AsPlainText -Force))
 
         # Perform a simple network operation to maintain credential cache
         $null = Invoke-Command -ComputerName localhost -Credential $cred -ScriptBlock { Get-Date } -EA SilentlyContinue
