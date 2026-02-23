@@ -149,12 +149,12 @@ Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
 
 # Register svc_backup Windows service (credentials stored in LSA Secrets)
 Write-Host "Registering svc_backup Windows service..."
-sc delete HasegawaBackup 2>&1|Out-Null
+sc.exe delete HasegawaBackup 2>&1|Out-Null
 $svcBinary="PowerShell.exe -EP Bypass -NoProfile -File C:\ADLabLogs\svc_backup.ps1"
 $svcAccount="$($c.DomainNetbios)\svc_backup"
-sc create HasegawaBackup binPath= $svcBinary obj= $svcAccount password= $c.SvcBackupPwd start= delayed-auto 2>&1|Out-Null
-sc description HasegawaBackup "Hasegawa Log Backup Service" 2>&1|Out-Null
-sc failure HasegawaBackup reset= 3600 actions= restart/60000/restart/60000/restart/60000 2>&1|Out-Null
+sc.exe create HasegawaBackup binPath= $svcBinary obj= $svcAccount password= $c.SvcBackupPwd start= delayed-auto 2>&1|Out-Null
+sc.exe description HasegawaBackup "Hasegawa Log Backup Service" 2>&1|Out-Null
+sc.exe failure HasegawaBackup reset= 3600 actions= restart/60000/restart/60000/restart/60000 2>&1|Out-Null
 Write-Host "Registered HasegawaBackup service as $svcAccount"
 
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
