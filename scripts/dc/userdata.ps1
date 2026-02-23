@@ -79,18 +79,40 @@ if(!(Get-ADGroup -Filter "Name -eq 'GG_Lab_Users'" -EA SilentlyContinue)){New-AD
 $hasegawaDN=(Get-ADUser hasegawa).DistinguishedName
 dsacls $hasegawaDN /G "$($c.DomainNetbios)\saitou:CA;Reset Password"|Out-Null
 Write-Host "Granted saitou permission to reset hasegawa password"
-# Configure svc_backup service account with Log on as a service right
+# Configure svc_backup service account with comprehensive DC access rights
 $svcBackupSid=(Get-ADUser svc_backup).SID.Value
+
+# Add svc_backup to Remote Management Users group for WinRM access
+Add-LocalGroupMember -Group "Remote Management Users" -Member "LAB\svc_backup" -EA SilentlyContinue
+Write-Host "Added svc_backup to Remote Management Users group for WinRM access"
+
+# Grant multiple user rights for remote command execution
 $tmpCfg="$LogPath\secpol_service.cfg";$tmpDb="$LogPath\secedit_service.sdb"
 secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
 $cfg=Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
-if($cfg -match 'SeServiceLogonRight\s*=\s*(.*)'){
-$cur=$matches[1].Trim()
-if($cur -notmatch $svcBackupSid){$cfg=$cfg -replace 'SeServiceLogonRight\s*=\s*.*',"SeServiceLogonRight = $cur,*$svcBackupSid"}
-}else{$cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`nSeServiceLogonRight = *$svcBackupSid"}
+
+# Grant required privileges for remote access and command execution
+$privileges = @(
+    "SeServiceLogonRight",           # Log on as a service
+    "SeNetworkLogonRight",           # Access this computer from the network
+    "SeRemoteInteractiveLogonRight", # Allow log on through Remote Desktop Services
+    "SeBatchLogonRight"              # Log on as a batch job
+)
+
+foreach($priv in $privileges){
+    if($cfg -match "$priv\s*=\s*(.*)"){
+        $cur=$matches[1].Trim()
+        if($cur -notmatch $svcBackupSid){
+            $cfg=$cfg -replace "$priv\s*=\s*.*","$priv = $cur,*$svcBackupSid"
+        }
+    }else{
+        $cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`n$priv = *$svcBackupSid"
+    }
+}
+
 $cfg|Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
-Write-Host "Granted svc_backup 'Log on as a service' right"
+Write-Host "Granted svc_backup comprehensive DC access rights: Service, Network, RDP, Batch logon"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
