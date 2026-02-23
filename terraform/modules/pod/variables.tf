@@ -117,3 +117,8 @@ variable "client_local_user_nagata_password" {
   type        = string
   sensitive   = true
 }
+
+variable "iam_instance_profile" {
+  description = "IAM instance profile name for EC2 instances"
+  type        = string
+}

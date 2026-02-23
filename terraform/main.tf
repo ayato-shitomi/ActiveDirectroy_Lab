@@ -76,4 +76,6 @@ module "pod" {
   dc_private_ip      = cidrhost(aws_subnet.private[count.index].cidr_block, 10)
   filesrv_private_ip = cidrhost(aws_subnet.private[count.index].cidr_block, 20)
   client_private_ip  = cidrhost(aws_subnet.private[count.index].cidr_block, 30)
+
+  iam_instance_profile = aws_iam_instance_profile.ec2_ssm_profile.name
 }

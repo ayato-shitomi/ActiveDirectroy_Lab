@@ -11,6 +11,7 @@ resource "aws_instance" "dc" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.dc_private_ip
+  iam_instance_profile   = var.iam_instance_profile
 
   root_block_device {
     volume_type           = "gp3"
@@ -49,6 +50,7 @@ resource "aws_instance" "filesrv" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.filesrv_private_ip
+  iam_instance_profile   = var.iam_instance_profile
 
   root_block_device {
     volume_type           = "gp3"
@@ -86,6 +88,7 @@ resource "aws_instance" "client" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   private_ip             = var.client_private_ip
+  iam_instance_profile   = var.iam_instance_profile
 
   root_block_device {
     volume_type           = "gp3"
