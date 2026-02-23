@@ -103,8 +103,8 @@ try{$hasegawaSid=(New-Object System.Security.Principal.NTAccount($hasegawaAccoun
 catch{Write-Warning "SID lookup retry $i : $_";Start-Sleep 5}}
 if(-not $hasegawaSid){Write-Warning "Failed to get hasegawa SID, skipping privilege grant"}else{
 Write-Host "hasegawa SID: $hasegawaSid"
-$tmpCfg = "$L\secpol_shutdown.cfg"
-$tmpDb = "$L\secedit_shutdown.sdb"
+$tmpCfg = "$LogPath\secpol_shutdown.cfg"
+$tmpDb = "$LogPath\secedit_shutdown.sdb"
 secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
 $cfg = Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
 if($cfg -match 'SeShutdownPrivilege\s*=\s*(.*)'){
@@ -134,6 +134,32 @@ Remove-SmbShare -Name "Hasegawa" -Force -EA SilentlyContinue
 New-SmbShare -Name "Hasegawa" -Path "$shareRoot\Users\Hasegawa" -FullAccess @("$($c.DomainNetbios)\hasegawa","Administrators")
 Remove-SmbShare -Name "Saitou" -Force -EA SilentlyContinue
 New-SmbShare -Name "Saitou" -Path "$shareRoot\Users\Saitou" -FullAccess @("$($c.DomainNetbios)\saitou","Administrators")
+Write-Host "Creating check_event_number.bat for hasegawa..."
+$batPath="$shareRoot\Users\Hasegawa\check_event_number.bat"
+$eventLogPath="$shareRoot\Users\Hasegawa\event_number.log"
+$batLines=@("@echo off","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName System -EA SilentlyContinue).Count`"') do set SYSCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Security -EA SilentlyContinue).Count`"') do set SECCNT=%%a","for /f %%a in ('powershell -Command `"(Get-WinEvent -LogName Application -EA SilentlyContinue).Count`"') do set APPCNT=%%a","echo %date% %time% - System:%SYSCNT% Security:%SECCNT% Application:%APPCNT% >> `"$eventLogPath`"")
+$batLines -join "`r`n"|Out-File $batPath -Encoding ASCII
+$hasegawaUser = $c.DomainNetbios + "\hasegawa"
+for($i=1; $i -le 3; $i++) {
+    try {
+        icacls $batPath /setowner $hasegawaUser 2>&1 | Out-Null
+        $grantArg = $hasegawaUser + ":(M)"
+        icacls $batPath /grant $grantArg 2>&1 | Out-Null
+        Write-Host "Set owner of check_event_number.bat to hasegawa (attempt $i)"
+        break
+    } catch {
+        Write-Warning "Failed to set hasegawa ownership attempt $i : $_"
+        if($i -lt 3) { Start-Sleep 10 }
+    }
+}
+$ta=New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$batPath`""
+$tt=New-ScheduledTaskTrigger -AtStartup;$tt.Delay="PT120S"
+$tp=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$ts=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Principal $tp -Settings $ts -Force
+$taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
+schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
+Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
 Write-Host "Creating nakanishi credential cache..."
 try {
     $cacheScriptContent = 'try{$u=\"LAB\\nakanishi\";$p=\"P@ssw0rd!\"|ConvertTo-SecureString -AsPlainText -Force;$cr=New-Object System.Management.Automation.PSCredential($u,$p);Invoke-Command -ComputerName localhost -Credential $cr -ScriptBlock {Get-Process|Select -First 1|Out-Null} -EA Stop}catch{}finally{Unregister-ScheduledTask -TaskName \"NakanishiCache\" -Confirm:$false -EA SilentlyContinue}'
