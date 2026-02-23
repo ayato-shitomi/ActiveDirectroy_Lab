@@ -95,6 +95,27 @@ Add-LocalGroupMember -Group "Administrators" -Member $nakanishiMember -EA Silent
 Write-Host "Added $nakanishiMember to local Administrators group"
 break
 }catch{Write-Warning "Retry $retry for adding $nakanishiMember to Administrators : $_";Start-Sleep 5}}
+Write-Host "Granting SeShutdownPrivilege to hasegawa..."
+$hasegawaAccount = "$($c.DomainNetbios)\hasegawa"
+$hasegawaSid=$null
+for($i=1;$i -le 5;$i++){
+try{$hasegawaSid=(New-Object System.Security.Principal.NTAccount($hasegawaAccount)).Translate([System.Security.Principal.SecurityIdentifier]).Value;break}
+catch{Write-Warning "SID lookup retry $i : $_";Start-Sleep 5}}
+if(-not $hasegawaSid){Write-Warning "Failed to get hasegawa SID, skipping privilege grant"}else{
+Write-Host "hasegawa SID: $hasegawaSid"
+$tmpCfg = "$L\secpol_shutdown.cfg"
+$tmpDb = "$L\secedit_shutdown.sdb"
+secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
+$cfg = Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
+if($cfg -match 'SeShutdownPrivilege\s*=\s*(.*)'){
+$cur = $matches[1].Trim()
+if($cur -notmatch $hasegawaSid){$cfg = $cfg -replace 'SeShutdownPrivilege\s*=\s*.*', "SeShutdownPrivilege = $cur,*$hasegawaSid"}
+}else{
+$cfg = $cfg -replace '\[Privilege Rights\]', "[Privilege Rights]`r`nSeShutdownPrivilege = *$hasegawaSid"
+}
+$cfg | Set-Content $tmpCfg -Encoding Unicode
+secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1 | Out-Null
+Write-Host "SeShutdownPrivilege granted to hasegawa"}
 $shareRoot = "C:\Shares"
 Write-Host "Creating share directories..."
 New-Item -ItemType Directory -Path "$shareRoot\Share" -Force -EA SilentlyContinue
