@@ -37,13 +37,36 @@ New-NetFirewallRule -DisplayName "WinRM-HTTP" -Direction Inbound -Protocol TCP -
 New-NetFirewallRule -DisplayName "WinRM-HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -EA SilentlyContinue
 Write-Host "WinRM enabled"
 Set-State "WAIT";Restart-Computer -Force;exit}
-"WAIT"{if(Test-DC){Set-State "JOIN"}else{Restart-Computer -Force;exit}}
+"WAIT"{
+Write-Host "WAIT: Testing DC connectivity"
+Start-Sleep 30
+if(Test-DC){
+Write-Host "DC is ready, proceeding to domain join"
+Set-State "JOIN";Restart-Computer -Force;exit
+}else{
+Write-Host "DC not ready, restarting"
+Restart-Computer -Force;exit}}
 "JOIN"{
+Write-Host "JOIN: Attempting domain join to $($c.DomainName)"
 $p=ConvertTo-SecureString $c.DomainPassword -AsPlainText -Force
 $cred=New-Object PSCredential("$($c.DomainName)\Administrator",$p)
+$joinSuccess=$false
 for($i=1;$i -le 10;$i++){
-try{Add-Computer -DomainName $c.DomainName -Credential $cred -Force -EA Stop;Set-State "SHARE";Restart-Computer -Force;exit}
-catch{Write-Warning "Join attempt $i failed: $_";Start-Sleep 60}}
+try{
+Write-Host "Domain join attempt $i/10 to $($c.DomainName)"
+Add-Computer -DomainName $c.DomainName -Credential $cred -Force -EA Stop
+$joinSuccess=$true
+Write-Host "Domain join successful!"
+Set-State "SHARE";Restart-Computer -Force;exit
+}catch{
+Write-Warning "Join attempt $i failed: $_"
+if($i -lt 10){Start-Sleep 60}}}
+if(-not $joinSuccess){
+Write-Error "All domain join attempts failed. Returning to WAIT state."
+Set-State "WAIT"
+Start-Sleep 300
+Restart-Computer -Force;exit
+}
 Restart-Computer -Force;exit}
 "SHARE"{
 Install-WindowsFeature -Name FS-FileServer -IncludeManagementTools
