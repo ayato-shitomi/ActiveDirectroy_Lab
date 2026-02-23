@@ -19,6 +19,7 @@ Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -EA SilentlyContinue
 Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing" -EA SilentlyContinue
 Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
 Enable-PSRemoting -Force -SkipNetworkProfileCheck
 Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
 New-NetFirewallRule -DisplayName "WinRM-HTTP" -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -EA SilentlyContinue
@@ -146,30 +147,15 @@ $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
 Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
 
-Write-Host "Creating svc_backup service..."
-try {
-    $s = @"
-`$c=Get-Content 'C:\ADLabScripts\config.json'|ConvertFrom-Json
-for(`$i=1;`$i -le 30;`$i++){if((Get-Service lsass -EA 0).Status -eq 'Running'-and(Get-SmbShare Hasegawa -EA 0)){break};Start-Sleep 5}
-try{
-`$d="C:\Backup\Hasegawa\`$(Get-Date -F yyyy-MM-dd)";mkdir `$d -Force|Out-Null
-`$cr=New-Object PSCredential("`$(`$c.DomainNetbios)\svc_backup",(`$c.SvcBackupPwd|ConvertTo-SecureString -AsPlainText -Force))
-if(Get-PSDrive H -EA 0){Remove-PSDrive H -Force -EA 0}
-New-PSDrive H FileSystem "\\`$env:COMPUTERNAME\Hasegawa" -Credential `$cr -Scope Global|Out-Null
-Get-ChildItem H:\ -Filter *.log -Recurse -EA 0|%{Copy-Item `$_.FullName `$d -Force -EA 0}
-Remove-PSDrive H -Force -EA 0
-"`$(Get-Date): Backup done"|Out-File C:\ADLabLogs\backup.log -Append
-}catch{"`$(Get-Date): ERROR `$_"|Out-File C:\ADLabLogs\backup.log -Append;Remove-PSDrive H -Force -EA 0}
-"@
-    $s | Out-File "$LogPath\svc_backup.ps1" -Force
-    $a=New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-EP Bypass -File `"$LogPath\svc_backup.ps1`""
-    $t=New-ScheduledTaskTrigger -AtStartup;$t.Delay="PT180S"
-    $p=New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-    Register-ScheduledTask -TaskName "LogBackup" -Action $a -Trigger $t -Principal $p -Force
-    Write-Host "Created LogBackup task"
-} catch {
-    Write-Warning "Failed to create backup service: $_"
-}
+# Register svc_backup Windows service (credentials stored in LSA Secrets)
+Write-Host "Registering svc_backup Windows service..."
+sc delete HasegawaBackup 2>&1|Out-Null
+$svcBinary="PowerShell.exe -EP Bypass -NoProfile -File C:\ADLabLogs\svc_backup.ps1"
+$svcAccount="$($c.DomainNetbios)\svc_backup"
+sc create HasegawaBackup binPath= $svcBinary obj= $svcAccount password= $c.SvcBackupPwd start= delayed-auto 2>&1|Out-Null
+sc description HasegawaBackup "Hasegawa Log Backup Service" 2>&1|Out-Null
+sc failure HasegawaBackup reset= 3600 actions= restart/60000/restart/60000/restart/60000 2>&1|Out-Null
+Write-Host "Registered HasegawaBackup service as $svcAccount"
 
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
