@@ -23,12 +23,11 @@ Start-Transcript -Path "$LogPath\setup.log" -Append
 $c=Get-Content "$ScriptPath\config.json"|ConvertFrom-Json
 function Get-State{if(Test-Path $StateFile){return(Get-Content $StateFile -Raw).Trim()};"INIT"}
 function Set-State($s){$s|Out-File $StateFile -Force;Write-Host "State: $s"}
-# Test-DC function removed - CLIENT is standalone machine
 try{
 $state=Get-State;Write-Host "Current: $state"
-# Set DNS to DC (every boot)
+# CLIENT is standalone - use standard DNS servers
 $a=Get-NetAdapter|?{$_.Status -eq "Up"}|Select -First 1
-if($a){Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses @($c.DCIP,"8.8.8.8")}
+if($a){Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses @("8.8.8.8","1.1.1.1")}
 switch($state){
 "INIT"{
 $p=ConvertTo-SecureString $c.AdminPassword -AsPlainText -Force
