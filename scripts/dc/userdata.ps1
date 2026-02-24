@@ -83,8 +83,38 @@ Write-Host "Granted saitou permission to reset hasegawa password"
 $svcBackupSid=(Get-ADUser svc_backup).SID.Value
 
 # Add svc_backup to local Administrators group for full WinRM access (most reliable approach)
-Add-LocalGroupMember -Group "Administrators" -Member "LAB\svc_backup" -EA SilentlyContinue
-Write-Host "Added svc_backup to local Administrators group for full DC access"
+try {
+    # Wait for AD replication and try multiple approaches
+    Start-Sleep 5
+
+    # Method 1: PowerShell cmdlet
+    Add-LocalGroupMember -Group "Administrators" -Member "LAB\svc_backup" -EA Stop
+    Write-Host "Added svc_backup to local Administrators group via PowerShell"
+} catch {
+    Write-Warning "PowerShell method failed: $_"
+    try {
+        # Method 2: net command as fallback
+        $result = net localgroup Administrators "LAB\svc_backup" /add 2>&1
+        Write-Host "Added svc_backup to local Administrators group via net command: $result"
+    } catch {
+        Write-Warning "Net command method also failed: $_"
+        # Method 3: Direct registry/API approach if needed
+        $domain = $c.DomainNetbios
+        $result = net localgroup Administrators "$domain\svc_backup" /add 2>&1
+        Write-Host "Added svc_backup using domain prefix: $result"
+    }
+}
+
+# Verify the addition worked
+$verification = net localgroup Administrators 2>&1 | Select-String "svc_backup"
+if($verification) {
+    Write-Host "Verification successful: svc_backup found in Administrators group"
+} else {
+    Write-Warning "Verification failed: svc_backup NOT found in Administrators group"
+    # List current members for debugging
+    Write-Host "Current Administrators group members:"
+    net localgroup Administrators
+}
 
 # Try to add to Remote Management Users if it exists, otherwise skip
 $rmGroup = Get-LocalGroup "Remote Management Users" -EA SilentlyContinue
