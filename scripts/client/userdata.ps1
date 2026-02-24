@@ -2,6 +2,16 @@
 $ErrorActionPreference="Continue"
 $LogPath="C:\ADLabLogs";$ScriptPath="C:\ADLabScripts"
 New-Item -ItemType Directory -Path $LogPath,$ScriptPath -Force -EA SilentlyContinue|Out-Null
+
+# Secure setup directories - Admin only access
+icacls $LogPath /inheritance:d 2>&1 | Out-Null
+icacls $LogPath /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
+icacls $LogPath /deny "Users:(OI)(CI)RX" "Everyone:(OI)(CI)RX" 2>&1 | Out-Null
+icacls $ScriptPath /inheritance:d 2>&1 | Out-Null
+icacls $ScriptPath /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
+icacls $ScriptPath /deny "Users:(OI)(CI)RX" "Everyone:(OI)(CI)RX" 2>&1 | Out-Null
+Write-Host "Secured setup directories - Admin access only"
+
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
 @{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";NagataPassword="${nagata_password}";SaitouPassword="${saitou_password}";FlagClientAdmin="${flag_client_admin}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
