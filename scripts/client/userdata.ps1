@@ -23,7 +23,7 @@ Start-Transcript -Path "$LogPath\setup.log" -Append
 $c=Get-Content "$ScriptPath\config.json"|ConvertFrom-Json
 function Get-State{if(Test-Path $StateFile){return(Get-Content $StateFile -Raw).Trim()};"INIT"}
 function Set-State($s){$s|Out-File $StateFile -Force;Write-Host "State: $s"}
-function Test-DC{for($i=1;$i -le 40;$i++){try{Resolve-DnsName -Name $c.DomainName -Server $c.DCIP -DnsOnly -EA Stop|Out-Null;return $true}catch{Write-Host "Wait DC $i/40";Start-Sleep 15}};$false}
+# Test-DC function removed - CLIENT is standalone machine
 try{
 $state=Get-State;Write-Host "Current: $state"
 # Set DNS to DC (every boot)
@@ -104,9 +104,7 @@ Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies
 Write-Host "LocalAccountTokenFilterPolicy set to 1 - local accounts will have full tokens via RDP"
 Set-State "CONFIG";Restart-Computer -Force;exit}
 "CONFIG"{
-# Wait for DC to be available (for DNS resolution of file server)
-if(-not (Test-DC)){Write-Warning "DC not ready, will retry next boot";Restart-Computer -Force;exit}
-Write-Host "DC is available, configuring..."
+Write-Host "Configuring CLIENT as standalone machine..."
 $podNum=$c.ComputerName -replace '\D',''
 $adminDoc="C:\Users\Administrator\Documents"
 New-Item -ItemType Directory -Path $adminDoc -Force -EA SilentlyContinue|Out-Null
@@ -118,7 +116,8 @@ $memoLines -join "`r`n"|Out-File "$adminDoc\memo.txt" -Encoding UTF8
 Write-Host "Created memo.txt with saitou credentials"
 $d="C:\Users\Public\Desktop";$ws=New-Object -ComObject WScript.Shell
 $sc=$ws.CreateShortcut("$d\PowerShell.lnk");$sc.TargetPath="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";$sc.Save()
-$sc=$ws.CreateShortcut("$d\File Server.lnk");$sc.TargetPath="\\FILESRV$podNum\Share";$sc.Save()
+# Note: File Server access available via IP address if needed (e.g., \\10.100.1.20\Share)
+Write-Host "CLIENT configured as standalone machine"
 # Create flag file on Administrator desktop
 $adminDesktop="C:\Users\Administrator\Desktop"
 New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue|Out-Null
