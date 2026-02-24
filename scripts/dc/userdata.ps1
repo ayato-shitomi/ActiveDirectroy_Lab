@@ -79,34 +79,60 @@ if(!(Get-ADGroup -Filter "Name -eq 'GG_Lab_Users'" -EA SilentlyContinue)){New-AD
 $hasegawaDN=(Get-ADUser hasegawa).DistinguishedName
 dsacls $hasegawaDN /G "$($c.DomainNetbios)\saitou:CA;Reset Password"|Out-Null
 Write-Host "Granted saitou permission to reset hasegawa password"
-# Configure svc_backup service account with comprehensive DC access rights
+# Configure svc_backup service account with comprehensive DC access rights including WinRM
 $svcBackupSid=(Get-ADUser svc_backup).SID.Value
 
-# Add svc_backup to Remote Management Users group for WinRM access
-Add-LocalGroupMember -Group "Remote Management Users" -Member "LAB\svc_backup" -EA SilentlyContinue
-Write-Host "Added svc_backup to Remote Management Users group for WinRM access"
+# Add svc_backup to local Administrators group for full WinRM access (most reliable approach)
+Add-LocalGroupMember -Group "Administrators" -Member "LAB\svc_backup" -EA SilentlyContinue
+Write-Host "Added svc_backup to local Administrators group for full DC access"
 
-# Grant multiple user rights for remote command execution
+# Try to add to Remote Management Users if it exists, otherwise skip
+$rmGroup = Get-LocalGroup "Remote Management Users" -EA SilentlyContinue
+if($rmGroup) {
+    Add-LocalGroupMember -Group "Remote Management Users" -Member "LAB\svc_backup" -EA SilentlyContinue
+    Write-Host "Added svc_backup to Remote Management Users group"
+} else {
+    Write-Host "Remote Management Users group not found, skipping (Administrator group membership sufficient)"
+}
+
+# Grant comprehensive user rights for all types of remote access
 $tmpCfg="$LogPath\secpol_service.cfg";$tmpDb="$LogPath\secedit_service.sdb"
 secedit /export /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
 $cfg=Get-Content $tmpCfg -Raw -Encoding Unicode -EA SilentlyContinue
 
-# Grant required privileges for remote access and command execution
+# Grant all required privileges for comprehensive remote access
 $privileges = @(
     "SeServiceLogonRight",           # Log on as a service
     "SeNetworkLogonRight",           # Access this computer from the network
     "SeRemoteInteractiveLogonRight", # Allow log on through Remote Desktop Services
-    "SeBatchLogonRight"              # Log on as a batch job
+    "SeBatchLogonRight",             # Log on as a batch job
+    "SeInteractiveLogonRight",       # Log on locally
+    "SeDenyNetworkLogonRight",       # Remove any deny network logon (we'll remove svc_backup from this)
+    "SeDenyRemoteInteractiveLogonRight" # Remove any deny RDP logon (we'll remove svc_backup from this)
 )
 
 foreach($priv in $privileges){
-    if($cfg -match "$priv\s*=\s*(.*)"){
-        $cur=$matches[1].Trim()
-        if($cur -notmatch $svcBackupSid){
-            $cfg=$cfg -replace "$priv\s*=\s*.*","$priv = $cur,*$svcBackupSid"
+    if($priv -like "SeDeny*"){
+        # For deny rights, remove svc_backup from the list if present
+        if($cfg -match "$priv\s*=\s*(.*)"){
+            $cur=$matches[1].Trim()
+            if($cur -match $svcBackupSid){
+                $newCur = $cur -replace ",?\*?$svcBackupSid",""
+                $newCur = $newCur -replace "^,",""
+                $cfg=$cfg -replace "$priv\s*=\s*.*","$priv = $newCur"
+                Write-Host "Removed svc_backup from $priv deny list"
+            }
         }
     }else{
-        $cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`n$priv = *$svcBackupSid"
+        # For allow rights, add svc_backup to the list if not present
+        if($cfg -match "$priv\s*=\s*(.*)"){
+            $cur=$matches[1].Trim()
+            if($cur -notmatch $svcBackupSid){
+                $cfg=$cfg -replace "$priv\s*=\s*.*","$priv = $cur,*$svcBackupSid"
+            }
+        }else{
+            $cfg=$cfg -replace '\[Privilege Rights\]',"[Privilege Rights]`r`n$priv = *$svcBackupSid"
+        }
     }
 }
 
