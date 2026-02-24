@@ -37,10 +37,12 @@ $downloadSuccess = $false
 for($retry = 1; $retry -le 3; $retry++) {
     try {
         Write-Host "Downloading setup scripts from GitHub (attempt $retry/3)..."
-        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/setup.ps1" -OutFile "$ScriptPath\setup.ps1" -UseBasicParsing -TimeoutSec 30
+        # Add TLS 1.2 support for older Windows versions
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/setup.ps1" -OutFile "$ScriptPath\setup.ps1" -UseBasicParsing -TimeoutSec 30 -MaximumRedirection 5
         Write-Host "Downloaded setup.ps1"
 
-        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/backup_service.ps1" -OutFile "$LogPath\svc_backup.ps1" -UseBasicParsing -TimeoutSec 30
+        Invoke-WebRequest -Uri "$baseUrl/scripts/filesrv/backup_service.ps1" -OutFile "$LogPath\svc_backup.ps1" -UseBasicParsing -TimeoutSec 30 -MaximumRedirection 5
         Write-Host "Downloaded backup_service.ps1"
 
         # Verify files exist and have content
