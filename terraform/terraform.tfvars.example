@@ -49,3 +49,10 @@ allowed_ssh_cidr = "0.0.0.0/0"
 
 # Optional: CLIENT local user password (default: P@ssw0rd!)
 # client_local_user_nagata_password = "P@ssw0rd!"
+
+# Optional: CTF Flags (default: THIS_IS_FLAG)
+# flag_client_admin      = "FLAG{client_admin_compromised}"
+# flag_filesrv_admin     = "FLAG{filesrv_admin_access}"
+# flag_filesrv_hasegawa  = "FLAG{hasegawa_desktop_found}"
+# flag_filesrv_saitou    = "FLAG{saitou_user_owned}"
+# flag_dc_admin          = "FLAG{domain_controller_pwned}"
