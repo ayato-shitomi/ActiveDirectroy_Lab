@@ -4,13 +4,11 @@ $LogPath = "C:\ADLabLogs"
 $ScriptPath = "C:\ADLabScripts"
 New-Item -ItemType Directory -Path $LogPath, $ScriptPath -Force -EA SilentlyContinue | Out-Null
 
-# Secure setup directories - Admin only access
-icacls $LogPath /inheritance:d 2>&1 | Out-Null
-icacls $LogPath /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
-icacls $LogPath /deny "Users:(OI)(CI)RX" "Everyone:(OI)(CI)RX" 2>&1 | Out-Null
-icacls $ScriptPath /inheritance:d 2>&1 | Out-Null
-icacls $ScriptPath /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
-icacls $ScriptPath /deny "Users:(OI)(CI)RX" "Everyone:(OI)(CI)RX" 2>&1 | Out-Null
+# Secure setup directories - Admin only access (fixed permissions)
+icacls $LogPath /grant "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
+icacls $LogPath /deny "Users:(OI)(CI)RX" 2>&1 | Out-Null
+icacls $ScriptPath /grant "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" 2>&1 | Out-Null
+icacls $ScriptPath /deny "Users:(OI)(CI)RX" 2>&1 | Out-Null
 Write-Host "Secured setup directories - Admin access only"
 
 Start-Transcript -Path "$LogPath\userdata.log" -Append
