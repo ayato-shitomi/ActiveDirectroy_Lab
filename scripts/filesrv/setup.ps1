@@ -167,6 +167,38 @@ sc.exe description HasegawaBackup "Hasegawa Log Backup Service" 2>&1|Out-Null
 sc.exe failure HasegawaBackup reset= 3600 actions= restart/60000/restart/60000/restart/60000 2>&1|Out-Null
 Write-Host "Registered HasegawaBackup service as $svcAccount"
 
+# Create flag files on user desktops
+Write-Host "Creating flag files on user desktops..."
+# Administrator desktop
+$adminDesktop = "C:\Users\Administrator\Desktop"
+New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue | Out-Null
+$c.FlagFilesrvAdmin | Out-File "$adminDesktop\flag.txt" -Encoding UTF8
+Write-Host "Created Administrator flag file"
+
+# Domain user desktops (create directories first as they may not exist yet)
+$hasegawaDesktop = "C:\Users\hasegawa\Desktop"
+$saitouDesktop = "C:\Users\saitou\Desktop"
+New-Item -ItemType Directory -Path $hasegawaDesktop -Force -EA SilentlyContinue | Out-Null
+New-Item -ItemType Directory -Path $saitouDesktop -Force -EA SilentlyContinue | Out-Null
+$c.FlagFilesrvHasegawa | Out-File "$hasegawaDesktop\flag.txt" -Encoding UTF8
+$c.FlagFilesrvSaitou | Out-File "$saitouDesktop\flag.txt" -Encoding UTF8
+Write-Host "Created hasegawa and saitou flag files"
+
+# Set proper ownership for domain user directories
+for($retry = 1; $retry -le 3; $retry++) {
+    try {
+        icacls $hasegawaDesktop /setowner "$($c.DomainNetbios)\hasegawa" /T 2>&1 | Out-Null
+        icacls "$hasegawaDesktop\flag.txt" /setowner "$($c.DomainNetbios)\hasegawa" 2>&1 | Out-Null
+        icacls $saitouDesktop /setowner "$($c.DomainNetbios)\saitou" /T 2>&1 | Out-Null
+        icacls "$saitouDesktop\flag.txt" /setowner "$($c.DomainNetbios)\saitou" 2>&1 | Out-Null
+        Write-Host "Set proper ownership for domain user flag files"
+        break
+    } catch {
+        Write-Warning "Failed to set ownership attempt $retry : $_"
+        if($retry -lt 3) { Start-Sleep 10 }
+    }
+}
+
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

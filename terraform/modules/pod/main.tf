@@ -30,6 +30,7 @@ resource "aws_instance" "dc" {
     svc_backup_password   = var.svc_backup_password
     user_password_hasegawa = var.user_password_hasegawa
     user_password_saitou   = var.user_password_saitou
+    flag_dc_admin   = var.flag_dc_admin
   }))
 
   tags = {
@@ -67,6 +68,9 @@ resource "aws_instance" "filesrv" {
     dc_ip                   = var.dc_private_ip
     computer_name           = "FILESRV${var.pod_index}"
     svc_backup_password = var.svc_backup_password
+    flag_filesrv_admin    = var.flag_filesrv_admin
+    flag_filesrv_hasegawa = var.flag_filesrv_hasegawa
+    flag_filesrv_saitou   = var.flag_filesrv_saitou
   }))
 
   tags = {
@@ -106,6 +110,7 @@ resource "aws_instance" "client" {
     computer_name   = "CLIENT${var.pod_index}"
     nagata_password   = var.client_local_user_nagata_password
     saitou_password = var.user_password_saitou
+    flag_client_admin = var.flag_client_admin
   }))
 
   tags = {

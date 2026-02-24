@@ -159,3 +159,34 @@ variable "user_password_saitou" {
   sensitive   = true
   default     = "P@ssw0rd!"
 }
+
+# CTF Flags Configuration
+variable "flag_client_admin" {
+  description = "Flag for CLIENT Administrator desktop"
+  type        = string
+  default     = "THIS_IS_FLAG"
+}
+
+variable "flag_filesrv_admin" {
+  description = "Flag for FILESRV Administrator desktop"
+  type        = string
+  default     = "THIS_IS_FLAG"
+}
+
+variable "flag_filesrv_hasegawa" {
+  description = "Flag for FILESRV hasegawa desktop"
+  type        = string
+  default     = "THIS_IS_FLAG"
+}
+
+variable "flag_filesrv_saitou" {
+  description = "Flag for FILESRV saitou desktop"
+  type        = string
+  default     = "THIS_IS_FLAG"
+}
+
+variable "flag_dc_admin" {
+  description = "Flag for DC Administrator desktop"
+  type        = string
+  default     = "THIS_IS_FLAG"
+}

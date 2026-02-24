@@ -4,7 +4,7 @@ $LogPath="C:\ADLabLogs";$ScriptPath="C:\ADLabScripts"
 New-Item -ItemType Directory -Path $LogPath,$ScriptPath -Force -EA SilentlyContinue|Out-Null
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";NagataPassword="${nagata_password}";SaitouPassword="${saitou_password}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DCIP="${dc_ip}";ComputerName="${computer_name}";NagataPassword="${nagata_password}";SaitouPassword="${saitou_password}";FlagClientAdmin="${flag_client_admin}"}|ConvertTo-Json|Out-File "$ScriptPath\config.json" -Force
 
 $s=@'
 $ErrorActionPreference="Continue"
@@ -109,6 +109,11 @@ Write-Host "Created memo.txt with saitou credentials"
 $d="C:\Users\Public\Desktop";$ws=New-Object -ComObject WScript.Shell
 $sc=$ws.CreateShortcut("$d\PowerShell.lnk");$sc.TargetPath="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";$sc.Save()
 $sc=$ws.CreateShortcut("$d\File Server.lnk");$sc.TargetPath="\\FILESRV$podNum\Share";$sc.Save()
+# Create flag file on Administrator desktop
+$adminDesktop="C:\Users\Administrator\Desktop"
+New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue|Out-Null
+$c.FlagClientAdmin|Out-File "$adminDesktop\flag.txt" -Encoding UTF8
+Write-Host "Created flag file on Administrator desktop"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

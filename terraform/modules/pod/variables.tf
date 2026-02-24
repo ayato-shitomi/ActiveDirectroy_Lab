@@ -122,3 +122,29 @@ variable "iam_instance_profile" {
   description = "IAM instance profile name for EC2 instances"
   type        = string
 }
+
+# CTF Flags
+variable "flag_client_admin" {
+  description = "Flag for CLIENT Administrator desktop"
+  type        = string
+}
+
+variable "flag_filesrv_admin" {
+  description = "Flag for FILESRV Administrator desktop"
+  type        = string
+}
+
+variable "flag_filesrv_hasegawa" {
+  description = "Flag for FILESRV hasegawa desktop"
+  type        = string
+}
+
+variable "flag_filesrv_saitou" {
+  description = "Flag for FILESRV saitou desktop"
+  type        = string
+}
+
+variable "flag_dc_admin" {
+  description = "Flag for DC Administrator desktop"
+  type        = string
+}

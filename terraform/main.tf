@@ -73,6 +73,13 @@ module "pod" {
 
   client_local_user_nagata_password = var.client_local_user_nagata_password
 
+  # CTF Flags
+  flag_client_admin      = var.flag_client_admin
+  flag_filesrv_admin     = var.flag_filesrv_admin
+  flag_filesrv_hasegawa  = var.flag_filesrv_hasegawa
+  flag_filesrv_saitou    = var.flag_filesrv_saitou
+  flag_dc_admin          = var.flag_dc_admin
+
   dc_private_ip      = cidrhost(aws_subnet.private[count.index].cidr_block, 10)
   filesrv_private_ip = cidrhost(aws_subnet.private[count.index].cidr_block, 20)
   client_private_ip  = cidrhost(aws_subnet.private[count.index].cidr_block, 30)

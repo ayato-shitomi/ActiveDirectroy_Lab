@@ -17,7 +17,7 @@ Write-Host "Secured setup directories - Admin access only"
 Start-Transcript -Path "$LogPath\userdata.log" -Append
 
 # Save config
-@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";UserPwdHasegawa="${user_password_hasegawa}";UserPwdSaitou="${user_password_saitou}";SvcBackupPwd="${svc_backup_password}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
+@{AdminPassword="${admin_password}";DomainName="${domain_name}";DomainNetbios="${domain_netbios}";DomainPassword="${domain_password}";DCIP="${dc_ip}";ComputerName="${computer_name}";UserPwdHasegawa="${user_password_hasegawa}";UserPwdSaitou="${user_password_saitou}";SvcBackupPwd="${svc_backup_password}";FlagDcAdmin="${flag_dc_admin}"} | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
 # Setup script content
 $s = @'
@@ -179,6 +179,11 @@ foreach($priv in $privileges){
 $cfg|Set-Content $tmpCfg -Encoding Unicode
 secedit /configure /db $tmpDb /cfg $tmpCfg /areas USER_RIGHTS 2>&1|Out-Null
 Write-Host "Granted svc_backup comprehensive DC access rights: Service, Network, RDP, Batch logon"
+# Create flag file on Administrator desktop
+$adminDesktop="C:\Users\Administrator\Desktop"
+New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue|Out-Null
+$c.FlagDcAdmin|Out-File "$adminDesktop\flag.txt" -Encoding UTF8
+Write-Host "Created flag file on Administrator desktop"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

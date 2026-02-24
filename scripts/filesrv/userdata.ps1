@@ -24,6 +24,9 @@ $config = @{
     DCIP = "${dc_ip}"
     ComputerName = "${computer_name}"
     SvcBackupPwd = "${svc_backup_password}"
+    FlagFilesrvAdmin = "${flag_filesrv_admin}"
+    FlagFilesrvHasegawa = "${flag_filesrv_hasegawa}"
+    FlagFilesrvSaitou = "${flag_filesrv_saitou}"
 }
 $config | ConvertTo-Json | Out-File "$ScriptPath\config.json" -Force
 
