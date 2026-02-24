@@ -145,6 +145,16 @@ $ts=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatt
 Register-ScheduledTask -TaskName "CheckEventNumber" -Action $ta -Trigger $tt -Principal $tp -Settings $ts -Force
 $taskSddl = "D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;AU)"
 schtasks /Change /TN "CheckEventNumber" /SD $taskSddl 2>&1 | Out-Null
+
+# Grant hasegawa read permissions to view scheduled tasks
+try {
+    icacls "C:\Windows\System32\Tasks\" /grant "$($c.DomainNetbios)\hasegawa:R" 2>&1 | Out-Null
+    icacls "C:\Windows\System32\Tasks\CheckEventNumber" /grant "$($c.DomainNetbios)\hasegawa:R" 2>&1 | Out-Null
+    Write-Host "Granted hasegawa read permissions to view CheckEventNumber task"
+} catch {
+    Write-Warning "Failed to grant task permissions to hasegawa: $_"
+}
+
 Write-Host "Created check_event_number.bat and CheckEventNumber scheduled task"
 
 # Register svc_backup Windows service (credentials stored in LSA Secrets)
