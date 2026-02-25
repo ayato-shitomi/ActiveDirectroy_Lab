@@ -245,6 +245,15 @@ $auditResults += "$_`: $LASTEXITCODE"
 $auditResults | Out-File "$LogPath\audit-status.log" -Append
 Write-Host "Audit policies configuration completed"
 
+# Enable command line logging for Process Creation events
+Write-Host "Enabling command line capture for Process Creation events..."
+$regResult = reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f 2>&1
+if($LASTEXITCODE -eq 0){
+    Write-Host "[OK] Command line logging enabled for Process Creation events"
+}else{
+    Write-Warning "[FAIL] Failed to enable command line logging: $regResult"
+}
+
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
