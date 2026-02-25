@@ -237,7 +237,7 @@ try {
 # Enable audit policies
 Write-Host "Enabling audit policies..."
 $auditResults = @()
-@("File System","Registry","Security State Change","User Account Management","Directory Service Changes","Directory Service Access","Process Creation","File Share","Detailed File Share","Handle Manipulation") | ForEach-Object {
+@("File System","Registry","Security State Change","User Account Management","Directory Service Changes","Directory Service Access","Process Creation","File Share","Detailed File Share","Handle Manipulation","Authorization Policy Change","Authentication Policy Change") | ForEach-Object {
 $result = auditpol /set /subcategory:"$_" /success:enable /failure:enable 2>&1
 if($LASTEXITCODE -eq 0){Write-Host "[OK] Enabled audit for: $_"}else{Write-Warning "[FAIL] Failed audit for: $_ - $result"}
 $auditResults += "$_`: $LASTEXITCODE"
