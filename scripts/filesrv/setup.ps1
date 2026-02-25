@@ -199,6 +199,14 @@ for($retry = 1; $retry -le 3; $retry++) {
     }
 }
 
+# Enable audit policies
+Write-Host "Enabling audit policies..."
+auditpol /set /subcategory:"File System" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"Registry" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"Security State Change" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable 2>&1 | Out-Null
+Write-Host "Audit policies enabled"
+
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

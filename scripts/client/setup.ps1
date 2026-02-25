@@ -104,6 +104,13 @@ $adminDesktop="C:\Users\Administrator\Desktop"
 New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue|Out-Null
 $c.FlagClientAdmin|Out-File "$adminDesktop\flag.txt" -Encoding UTF8
 Write-Host "Created flag file on Administrator desktop"
+# Enable audit policies
+Write-Host "Enabling audit policies..."
+auditpol /set /subcategory:"File System" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"Registry" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"Security State Change" /success:enable /failure:enable 2>&1 | Out-Null
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable 2>&1 | Out-Null
+Write-Host "Audit policies enabled"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
