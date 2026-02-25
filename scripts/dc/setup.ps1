@@ -30,7 +30,7 @@ $a=Get-NetAdapter|?{$_.Status -eq "Up"}|Select -First 1
 if($a){Set-NetIPInterface -InterfaceIndex $a.ifIndex -Dhcp Disabled -EA SilentlyContinue
 Remove-NetIPAddress -InterfaceIndex $a.ifIndex -Confirm:$false -EA SilentlyContinue
 Remove-NetRoute -InterfaceIndex $a.ifIndex -Confirm:$false -EA SilentlyContinue
-$gw=$c.DCIP -replace '\.\\d+$','.1'
+$gw=$c.DCIP -replace '\.\d+$','.1'
 New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress $c.DCIP -PrefixLength 24 -DefaultGateway $gw
 Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses @("127.0.0.1","8.8.8.8")}
 Set-State "INSTALL";Restart-Computer -Force;exit}
