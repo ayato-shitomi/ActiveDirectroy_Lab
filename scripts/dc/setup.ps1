@@ -162,16 +162,16 @@ $adminDesktop="C:\Users\Administrator\Desktop"
 New-Item -ItemType Directory -Path $adminDesktop -Force -EA SilentlyContinue|Out-Null
 $c.FlagDcAdmin|Out-File "$adminDesktop\flag.txt" -Encoding UTF8
 Write-Host "Created flag file on Administrator desktop"
-# Enable audit policies
-Write-Host "Enabling audit policies..."
+# Enable comprehensive audit policies for AD monitoring
+Write-Host "Enabling comprehensive audit policies for Active Directory monitoring..."
 $auditResults = @()
-@("File System","Registry","Security State Change","User Account Management") | ForEach-Object {
+@("File System","Registry","Security State Change","User Account Management","Directory Service Changes","Directory Service Access","Process Creation") | ForEach-Object {
 $result = auditpol /set /subcategory:"$_" /success:enable /failure:enable 2>&1
 if($LASTEXITCODE -eq 0){Write-Host "[OK] Enabled audit for: $_"}else{Write-Warning "[FAIL] Failed audit for: $_ - $result"}
 $auditResults += "$_`: $LASTEXITCODE"
 }
 $auditResults | Out-File "$LogPath\audit-status.log" -Append
-Write-Host "Audit policies configuration completed"
+Write-Host "Comprehensive audit policies configuration completed"
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 "DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}

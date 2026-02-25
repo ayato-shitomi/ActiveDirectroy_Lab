@@ -199,10 +199,45 @@ for($retry = 1; $retry -le 3; $retry++) {
     }
 }
 
+# Configure File System SACL for C:\Shares monitoring
+Write-Host "Configuring File System SACL for C:\Shares access monitoring..."
+try {
+    $sharesPath = "C:\Shares"
+    if(Test-Path $sharesPath) {
+        # Set SACL on C:\Shares to monitor all access
+        icacls "$sharesPath" /audit "(Everyone):(OI)(CI)(F)" 2>&1 | Out-Null
+        Write-Host "[OK] File System SACL configured for C:\Shares monitoring"
+
+        # Also set SACL on subdirectories
+        Get-ChildItem "$sharesPath" -Directory -EA SilentlyContinue | ForEach-Object {
+            icacls "$($_.FullName)" /audit "(Everyone):(OI)(CI)(F)" 2>&1 | Out-Null
+        }
+        Write-Host "[OK] File System SACL configured for C:\Shares subdirectories"
+    }
+} catch {
+    Write-Warning "[FAIL] File System SACL configuration failed: $_"
+}
+
+# Configure Registry SACL for LSA Secrets monitoring
+Write-Host "Configuring Registry SACL for LSA Secrets access monitoring..."
+try {
+    # Set SACL on HKLM\SECURITY\Policy\Secrets to detect LSA secrets access
+    $regPath = "HKLM\SECURITY\Policy\Secrets"
+    $acl = Get-Acl -Path "Registry::$regPath" -EA SilentlyContinue
+    if($acl) {
+        $auditRule = New-Object System.Security.AccessControl.RegistryAuditRule("Everyone","FullControl","ContainerInherit,ObjectInherit","None","Success,Failure")
+        $acl.SetAuditRule($auditRule)
+        Set-Acl -Path "Registry::$regPath" -AclObject $acl -EA SilentlyContinue
+        Write-Host "[OK] Registry SACL configured for LSA Secrets monitoring"
+    }
+} catch {
+    Write-Warning "[FAIL] Registry SACL configuration failed: $_"
+}
+
 # Enable audit policies
 Write-Host "Enabling audit policies..."
 $auditResults = @()
-@("File System","Registry","Security State Change","User Account Management") | ForEach-Object {
+@("File System","Registry","Security State Change","User Account Management","Directory Service Changes","Directory Service Access","Process Creation") | ForEach-Object {
 $result = auditpol /set /subcategory:"$_" /success:enable /failure:enable 2>&1
 if($LASTEXITCODE -eq 0){Write-Host "[OK] Enabled audit for: $_"}else{Write-Warning "[FAIL] Failed audit for: $_ - $result"}
 $auditResults += "$_`: $LASTEXITCODE"
