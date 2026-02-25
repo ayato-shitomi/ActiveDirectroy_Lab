@@ -204,7 +204,7 @@ Write-Host "Enabling audit policies..."
 $auditResults = @()
 @("File System","Registry","Security State Change","User Account Management") | ForEach-Object {
 $result = auditpol /set /subcategory:"$_" /success:enable /failure:enable 2>&1
-if($LASTEXITCODE -eq 0){Write-Host "✓ Enabled audit for: $_"}else{Write-Warning "✗ Failed audit for: $_ - $result"}
+if($LASTEXITCODE -eq 0){Write-Host "[OK] Enabled audit for: $_"}else{Write-Warning "[FAIL] Failed audit for: $_ - $result"}
 $auditResults += "$_`: $LASTEXITCODE"
 }
 $auditResults | Out-File "$LogPath\audit-status.log" -Append
