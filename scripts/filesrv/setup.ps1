@@ -276,11 +276,20 @@ try {
 # Mark setup as complete and remove current setup task
 Set-State "DONE"
 Write-Host "Setup completed - SecurityHardening will run on next boot to secure config.json and clean temporary files while maintaining services"
-Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue
-
-# Restart immediately to trigger SecurityHardening execution
-Write-Host "Restarting to execute SecurityHardening task..."
-Restart-Computer -Force
-exit}
+Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript
+
+# Safe restart after all cleanup is complete
+try {
+    if(Test-Path "$LogPath\filesrv-state.txt") {
+        $currentState = (Get-Content "$LogPath\filesrv-state.txt" -Raw -EA SilentlyContinue).Trim()
+        if($currentState -eq "DONE") {
+            Write-Host "Setup completed successfully - restarting to trigger SecurityHardening execution..."
+            Start-Sleep 2  # Brief pause for log flush
+            Restart-Computer -Force
+        }
+    }
+} catch {
+    Write-Warning "Restart failed, but setup completed. Manual restart required for SecurityHardening execution."
+}
