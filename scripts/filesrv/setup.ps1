@@ -259,7 +259,7 @@ Write-Host "Creating SecurityHardening scheduled task for final security hardeni
 try {
     $secAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File C:\ADLabScripts\security-hardening.ps1"
     $secTrigger = New-ScheduledTaskTrigger -AtStartup
-    $secTrigger.Delay = "PT180S"  # 3 minutes delay to ensure all services (including HasegawaBackup) are ready
+    $secTrigger.Delay = "PT300S"  # 5 minutes delay to ensure HasegawaBackup (delayed-auto) service is fully operational
     $secPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     $secSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 

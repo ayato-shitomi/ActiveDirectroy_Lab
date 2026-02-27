@@ -36,6 +36,20 @@ try {
 
     Write-Host "Setup completed, proceeding with security hardening..."
 
+    # Additional safety: Check if HasegawaBackup service is ready (to avoid file conflicts)
+    try {
+        $svcStatus = Get-Service -Name "HasegawaBackup" -EA SilentlyContinue
+        if($svcStatus) {
+            Write-Host "HasegawaBackup service status: $($svcStatus.Status)"
+            if($svcStatus.Status -eq "Starting") {
+                Write-Host "Waiting additional 30 seconds for HasegawaBackup service to fully start..."
+                Start-Sleep 30
+            }
+        }
+    } catch {
+        Write-Warning "Could not check HasegawaBackup service status: $_"
+    }
+
     # Preserve current state before cleanup
     $newStateLocation = "$HardeningLogPath\filesrv-state.txt"
     if(Test-Path $StateFile) {

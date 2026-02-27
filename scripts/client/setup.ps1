@@ -145,7 +145,7 @@ Write-Host "Creating SecurityHardening scheduled task for final cleanup..."
 try {
     $secAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File C:\ADLabScripts\security-hardening.ps1"
     $secTrigger = New-ScheduledTaskTrigger -AtStartup
-    $secTrigger.Delay = "PT120S"  # 2 minutes delay to ensure all services are ready
+    $secTrigger.Delay = "PT180S"  # 3 minutes delay to ensure system is fully stable
     $secPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     $secSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
 
