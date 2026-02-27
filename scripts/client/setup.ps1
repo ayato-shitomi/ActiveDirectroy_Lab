@@ -139,46 +139,29 @@ if($LASTEXITCODE -eq 0){
 }else{
     Write-Warning "[FAIL] Failed to enable command line logging: $regResult"
 }
-Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
-"DONE"{
-# Clean up sensitive setup files while preserving state
-Write-Host "Cleaning up setup files for security..."
+
+# Create SecurityHardening scheduled task for post-setup cleanup
+Write-Host "Creating SecurityHardening scheduled task for final cleanup..."
 try {
-    # Update StateFile path to new location before cleanup
-    $newStateLocation = "C:\Windows\Logs\client-state.txt"
-    $StateFile = $newStateLocation
+    $secAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File C:\ADLabScripts\security-hardening.ps1"
+    $secTrigger = New-ScheduledTaskTrigger -AtStartup
+    $secTrigger.Delay = "PT120S"  # 2 minutes delay to ensure all services are ready
+    $secPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $secSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
 
-    # Create secure log directory
-    $secureLogPath = "C:\Windows\Logs"
-    New-Item -ItemType Directory -Path $secureLogPath -Force -EA SilentlyContinue | Out-Null
+    # Remove existing task if present
+    Unregister-ScheduledTask -TaskName "SecurityHardening" -Confirm:$false -EA SilentlyContinue
 
-    # Backup current state before cleanup
-    if(Test-Path "C:\ADLabLogs\client-state.txt") {
-        Copy-Item "C:\ADLabLogs\client-state.txt" $newStateLocation -Force
-        Write-Host "Preserved client-state.txt in secure location"
-    }
-
-    # Remove sensitive directories containing credentials
-    if(Test-Path "C:\ADLabScripts") {
-        Remove-Item "C:\ADLabScripts" -Recurse -Force -EA SilentlyContinue
-        Write-Host "Removed C:\ADLabScripts (contained config.json with admin passwords)"
-    }
-    if(Test-Path "C:\ADLabLogs") {
-        Remove-Item "C:\ADLabLogs" -Recurse -Force -EA SilentlyContinue
-        Write-Host "Removed C:\ADLabLogs (contained setup logs and temp files)"
-    }
-
-    # Verify state preservation
-    if(Test-Path $newStateLocation) {
-        $finalState = Get-Content $newStateLocation -Raw -EA SilentlyContinue
-        Write-Host "State preserved: $($finalState.Trim())"
-    }
-
-    Write-Host "[SECURITY] Cleanup completed - sensitive credential files removed, state preserved"
+    # Register new SecurityHardening task
+    Register-ScheduledTask -TaskName "SecurityHardening" -Action $secAction -Trigger $secTrigger -Principal $secPrincipal -Settings $secSettings -Force
+    Write-Host "[OK] SecurityHardening task created - will execute security cleanup after next reboot"
 } catch {
-    Write-Warning "Setup cleanup failed: $_"
-    $_ | Out-File "C:\Windows\Logs\cleanup-error.log" -Append -EA SilentlyContinue
+    Write-Warning "[FAIL] Failed to create SecurityHardening task: $_"
 }
+
+# Mark setup as complete and remove current setup task
+Set-State "DONE"
+Write-Host "Setup completed - SecurityHardening will run on next boot to secure sensitive files"
 Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript

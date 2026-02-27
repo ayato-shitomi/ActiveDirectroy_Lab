@@ -34,8 +34,12 @@ for($retry = 1; $retry -le 3; $retry++) {
         Invoke-WebRequest -Uri "$baseUrl/scripts/client/setup.ps1" -OutFile "$ScriptPath\setup.ps1" -UseBasicParsing -TimeoutSec 30 -MaximumRedirection 5
         Write-Host "Downloaded setup.ps1"
 
+        Invoke-WebRequest -Uri "$baseUrl/scripts/client/security-hardening.ps1" -OutFile "$ScriptPath\security-hardening.ps1" -UseBasicParsing -TimeoutSec 30 -MaximumRedirection 5
+        Write-Host "Downloaded security-hardening.ps1"
+
         # Verify file exists and has content
-        if((Test-Path "$ScriptPath\setup.ps1") -and ((Get-Item "$ScriptPath\setup.ps1").Length -gt 0)) {
+        if((Test-Path "$ScriptPath\setup.ps1") -and ((Get-Item "$ScriptPath\setup.ps1").Length -gt 0) -and
+           (Test-Path "$ScriptPath\security-hardening.ps1") -and ((Get-Item "$ScriptPath\security-hardening.ps1").Length -gt 0)) {
             $downloadSuccess = $true
             Write-Host "All scripts downloaded successfully"
             break

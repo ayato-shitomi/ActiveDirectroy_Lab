@@ -254,68 +254,28 @@ if($LASTEXITCODE -eq 0){
     Write-Warning "[FAIL] Failed to enable command line logging: $regResult"
 }
 
-Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
-"DONE"{
-# Secure sensitive configuration files while maintaining service functionality
-Write-Host "Implementing security hardening for sensitive files..."
+# Create SecurityHardening scheduled task for post-setup security measures
+Write-Host "Creating SecurityHardening scheduled task for final security hardening..."
 try {
-    # Update StateFile path to secure location before cleanup
-    $secureLogPath = "C:\Windows\Logs"
-    $newStateLocation = "$secureLogPath\filesrv-state.txt"
-    New-Item -ItemType Directory -Path $secureLogPath -Force -EA SilentlyContinue | Out-Null
+    $secAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -NoProfile -File C:\ADLabScripts\security-hardening.ps1"
+    $secTrigger = New-ScheduledTaskTrigger -AtStartup
+    $secTrigger.Delay = "PT180S"  # 3 minutes delay to ensure all services (including HasegawaBackup) are ready
+    $secPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $secSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 
-    # Preserve current state before cleanup
-    if(Test-Path "C:\ADLabLogs\filesrv-state.txt") {
-        Copy-Item "C:\ADLabLogs\filesrv-state.txt" $newStateLocation -Force
-        Write-Host "Preserved filesrv-state.txt in secure location"
-    }
+    # Remove existing task if present
+    Unregister-ScheduledTask -TaskName "SecurityHardening" -Confirm:$false -EA SilentlyContinue
 
-    # Harden config.json permissions - accessible only to service accounts and administrators
-    $configPath = "C:\ADLabScripts\config.json"
-    if(Test-Path $configPath) {
-        # Remove inheritance and set explicit permissions
-        icacls $configPath /inheritance:d 2>&1 | Out-Null
-        icacls $configPath /grant:r "Administrators:(F)" "SYSTEM:(F)" "$($c.DomainNetbios)\svc_backup:(R)" 2>&1 | Out-Null
-        icacls $configPath /deny "$($c.DomainNetbios)\hasegawa:(F)" "$($c.DomainNetbios)\saitou:(F)" "Users:(F)" 2>&1 | Out-Null
-        Write-Host "Hardened config.json permissions - blocked general user access while maintaining service functionality"
-    }
-
-    # Remove temporary setup files (keep operational files for services)
-    $tempFiles = @(
-        "C:\ADLabLogs\setup.log",
-        "C:\ADLabLogs\error.log",
-        "C:\ADLabLogs\audit-status.log",
-        "C:\ADLabLogs\secpol_*.cfg",
-        "C:\ADLabLogs\secedit_*.sdb",
-        "C:\ADLabLogs\download_error.log"
-    )
-
-    foreach($pattern in $tempFiles) {
-        Get-ChildItem $pattern -EA SilentlyContinue | ForEach-Object {
-            Remove-Item $_.FullName -Force -EA SilentlyContinue
-            Write-Host "Removed temporary file: $($_.Name)"
-        }
-    }
-
-    # Verify service-critical files remain accessible
-    if(Test-Path "C:\ADLabLogs\svc_backup.ps1") {
-        Write-Host "Verified: svc_backup.ps1 preserved for HasegawaBackup service"
-    }
-    if(Test-Path $configPath) {
-        Write-Host "Verified: config.json preserved with hardened permissions for service access"
-    }
-
-    # Verify state preservation
-    if(Test-Path $newStateLocation) {
-        $finalState = Get-Content $newStateLocation -Raw -EA SilentlyContinue
-        Write-Host "State preserved: $($finalState.Trim())"
-    }
-
-    Write-Host "[SECURITY] FILESRV hardening completed - sensitive files secured, services maintained"
+    # Register new SecurityHardening task
+    Register-ScheduledTask -TaskName "SecurityHardening" -Action $secAction -Trigger $secTrigger -Principal $secPrincipal -Settings $secSettings -Force
+    Write-Host "[OK] SecurityHardening task created - will execute security hardening after next reboot"
 } catch {
-    Write-Warning "Security hardening failed: $_"
-    $_ | Out-File "C:\Windows\Logs\filesrv-security-error.log" -Append -EA SilentlyContinue
+    Write-Warning "[FAIL] Failed to create SecurityHardening task: $_"
 }
+
+# Mark setup as complete and remove current setup task
+Set-State "DONE"
+Write-Host "Setup completed - SecurityHardening will run on next boot to secure config.json and clean temporary files while maintaining services"
 Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript
