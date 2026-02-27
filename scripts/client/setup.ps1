@@ -162,6 +162,11 @@ try {
 # Mark setup as complete and remove current setup task
 Set-State "DONE"
 Write-Host "Setup completed - SecurityHardening will run on next boot to secure sensitive files"
-Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
+Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue
+
+# Restart immediately to trigger SecurityHardening execution
+Write-Host "Restarting to execute SecurityHardening task..."
+Restart-Computer -Force
+exit}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript
