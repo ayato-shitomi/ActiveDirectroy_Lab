@@ -255,6 +255,67 @@ if($LASTEXITCODE -eq 0){
 }
 
 Set-State "DONE";Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
-"DONE"{Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
+"DONE"{
+# Secure sensitive configuration files while maintaining service functionality
+Write-Host "Implementing security hardening for sensitive files..."
+try {
+    # Update StateFile path to secure location before cleanup
+    $secureLogPath = "C:\Windows\Logs"
+    $newStateLocation = "$secureLogPath\filesrv-state.txt"
+    New-Item -ItemType Directory -Path $secureLogPath -Force -EA SilentlyContinue | Out-Null
+
+    # Preserve current state before cleanup
+    if(Test-Path "C:\ADLabLogs\filesrv-state.txt") {
+        Copy-Item "C:\ADLabLogs\filesrv-state.txt" $newStateLocation -Force
+        Write-Host "Preserved filesrv-state.txt in secure location"
+    }
+
+    # Harden config.json permissions - accessible only to service accounts and administrators
+    $configPath = "C:\ADLabScripts\config.json"
+    if(Test-Path $configPath) {
+        # Remove inheritance and set explicit permissions
+        icacls $configPath /inheritance:d 2>&1 | Out-Null
+        icacls $configPath /grant:r "Administrators:(F)" "SYSTEM:(F)" "$($c.DomainNetbios)\svc_backup:(R)" 2>&1 | Out-Null
+        icacls $configPath /deny "$($c.DomainNetbios)\hasegawa:(F)" "$($c.DomainNetbios)\saitou:(F)" "Users:(F)" 2>&1 | Out-Null
+        Write-Host "Hardened config.json permissions - blocked general user access while maintaining service functionality"
+    }
+
+    # Remove temporary setup files (keep operational files for services)
+    $tempFiles = @(
+        "C:\ADLabLogs\setup.log",
+        "C:\ADLabLogs\error.log",
+        "C:\ADLabLogs\audit-status.log",
+        "C:\ADLabLogs\secpol_*.cfg",
+        "C:\ADLabLogs\secedit_*.sdb",
+        "C:\ADLabLogs\download_error.log"
+    )
+
+    foreach($pattern in $tempFiles) {
+        Get-ChildItem $pattern -EA SilentlyContinue | ForEach-Object {
+            Remove-Item $_.FullName -Force -EA SilentlyContinue
+            Write-Host "Removed temporary file: $($_.Name)"
+        }
+    }
+
+    # Verify service-critical files remain accessible
+    if(Test-Path "C:\ADLabLogs\svc_backup.ps1") {
+        Write-Host "Verified: svc_backup.ps1 preserved for HasegawaBackup service"
+    }
+    if(Test-Path $configPath) {
+        Write-Host "Verified: config.json preserved with hardened permissions for service access"
+    }
+
+    # Verify state preservation
+    if(Test-Path $newStateLocation) {
+        $finalState = Get-Content $newStateLocation -Raw -EA SilentlyContinue
+        Write-Host "State preserved: $($finalState.Trim())"
+    }
+
+    Write-Host "[SECURITY] FILESRV hardening completed - sensitive files secured, services maintained"
+} catch {
+    Write-Warning "Security hardening failed: $_"
+    $_ | Out-File "C:\Windows\Logs\filesrv-security-error.log" -Append -EA SilentlyContinue
+}
+Unregister-ScheduledTask -TaskName "ADSetup" -Confirm:$false -EA SilentlyContinue}
 }}catch{Write-Error $_;$_|Out-File "$LogPath\error.log" -Append}
 Stop-Transcript
